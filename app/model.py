@@ -146,8 +146,7 @@ def _join_as_room_member(conn, room_id:int, token: str) -> int:
         elif joined_user_count < MAX_USER_COUNT:
             if token not in members:
                 # 空いてる席に追加
-                new_member_num = joined_user_count + absent_member_idx[0]
-                return _insert_new_member(conn, room_id, new_member_num, token)
+                return _insert_new_member(conn, room_id, absent_member_idx[0], token)
             else:
                 return 1
         else:

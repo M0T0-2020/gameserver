@@ -43,7 +43,14 @@ def create_user(name: str, leader_card_id: int) -> str:
 
 def _get_user_by_token(conn, token: str) -> Optional[SafeUser]:
     # TODO: 実装
-    pass
+    result = conn.execute(
+        text("select id,name,leader_card_id from user where token=:token"),
+        {"token":token},
+    )
+    try:
+        return SafeUser.from_orm(result.one())
+    except NoResultFound:
+        return None
 
 
 def get_user_by_token(token: str) -> Optional[SafeUser]:

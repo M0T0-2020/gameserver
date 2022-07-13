@@ -73,3 +73,20 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
             )
         except NoResultFound:
             return None
+
+def create_room(host_token:str, live_id:int, select_difficulity:int):
+    room_id = str(uuid.uuid4())
+    with engine.begin() as conn:
+        result_create = conn.execute(
+            text(
+                "INSERT INTO `room` (room_id, live_id, select_difficulity) VALUES (:room_id, :live_id, :select_difficulity)"
+            ),
+            {"room_id": room_id, "live_id":live_id, "select_difficulity":select_difficulity},
+        )
+        result_join = conn.execute(
+            text(
+                "INSERT INTO `room_member` (room_id, member1) VALUES (:room_id, :member1)"
+            ),
+            {"room_id":room_id, "member1":host_token}
+        )
+    return room_id

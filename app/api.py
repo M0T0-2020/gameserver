@@ -29,6 +29,13 @@ class UserCreateResponse(BaseModel):
     user_token: str
 
 
+class RoomCreateRequest(BaseModel):
+    live_id:int
+    select_difficulty:int
+
+class RoomCreateResponse(BaseModel):
+    room_id:str
+
 @app.post("/user/create", response_model=UserCreateResponse)
 def user_create(req: UserCreateRequest):
     """新規ユーザー作成"""
@@ -65,3 +72,9 @@ def update(req: UserCreateRequest, token: str = Depends(get_auth_token)):
     # print(req)
     model.update_user(token, req.user_name, req.leader_card_id)
     return {}
+
+
+@app.post("/room/create", response_model=RoomCreateResponse)
+def room_create(req: RoomCreateRequest, token: str = Depends(get_auth_token)):
+    room_id = model.create_room(token, req.live_id, req.select_difficulty)
+    return RoomCreateResponse(room_id=room_id)

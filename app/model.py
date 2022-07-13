@@ -93,6 +93,7 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
             return None
 
 def create_room(host_token:str, live_id:int, select_difficulty:int):
+    assert select_difficulty == 1 or select_difficulty == 2
     with engine.begin() as conn:
         result = conn.execute(
             text(
@@ -127,11 +128,10 @@ def _insert_new_member(conn, room_id:int, member_num:int, token:str) -> int:
         conn.execute(
             text(f"UPDATE `room` SET `member{member_num}`=:member_token WHERE `room_id`=:room_id"),
             {"room_id": room_id, "member_token":token}
-        )    
+        )
         return 1
     except NoResultFound:
-        return None
-
+        return 4
 
 def _join_as_room_member(conn, room_id:int, token: str) -> int:
     try:
@@ -141,14 +141,16 @@ def _join_as_room_member(conn, room_id:int, token: str) -> int:
         )
         row = result.one()
         members = [row[f"member{i}"] for i in range(1, MAX_USER_COUNT + 1) if row[f"member{i}"] is not None]
+        absent_member_idx = [i for i in range(1, MAX_USER_COUNT + 1) if row[f"member{i}"] is None]
         joined_user_count = len(members)
         if (joined_user_count < MAX_USER_COUNT) and (token not in members):
-            new_member_num = joined_user_count + 1
+            # 空いてる席に追加
+            new_member_num = joined_user_count + absent_member_idx[0]
             return _insert_new_member(conn, room_id, new_member_num, token)
         else:
-            return 0
+            return 2
     except NoResultFound:
-        return None
+        return 4
 
 def list_room(live_id:int) -> List[RoomListElement]:
     room_info_list = []
@@ -187,7 +189,13 @@ def _get_room_user_list(conn, room_id:str) -> List[RoomUserListElement]:
         )
         row = result.one()
         user_info_list = _get_user_info(conn, row)
-        status = int(len(user_info_list) != MAX_USER_COUNT)
+
+        if len(user_info_list) != MAX_USER_COUNT:
+            status = 1
+        elif len(user_info_list) == MAX_USER_COUNT:
+            status = 2
+        else:
+            status = 3
         return status, user_info_list
     except NoResultFound:
         return None

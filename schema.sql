@@ -10,26 +10,14 @@ CREATE TABLE `user` (
 
 DROP TABLE IF EXISTS `room`;
 CREATE TABLE `room` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `room_id` varchar(255) DEFAULT NULL,
+  `room_id` bigint NOT NULL AUTO_INCREMENT,
   `live_id` int DEFAULT NULL,
   `select_difficulity` int DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `room_id` (`room_id`)
-);
-
-DROP TABLE IF EXISTS `room_member`;
-CREATE TABLE `room_member` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `room_id` varchar(255) DEFAULT NULL,
   `member1` varchar(255) DEFAULT NULL,
   `member2` varchar(255) DEFAULT NULL,
   `member3` varchar(255) DEFAULT NULL,
   `member4` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `room_id` (`room_id`),
-  UNIQUE KEY `member1` (`member1`),
-  UNIQUE KEY `member2` (`member2`),
-  UNIQUE KEY `member3` (`member3`),
-  UNIQUE KEY `member4` (`member4`)
+  PRIMARY KEY (`room_id`)
+  UNIQUE KEY `room_id` (`room_id`)
+
 );

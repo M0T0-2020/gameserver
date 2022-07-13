@@ -26,17 +26,6 @@ class SafeUser(BaseModel):
     class Config:
         orm_mode = True
 
-class Room(BaseModel):
-    """Room Data"""
-
-    id: int
-    room_id: str
-    live_id: int
-    select_difficulity: int
-
-    class Config:
-        orm_mode = True
-
 class RoomListElement(BaseModel):
     room_id:str
     live_id:int
@@ -95,78 +84,66 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
             return None
 
 def create_room(host_token:str, live_id:int, select_difficulity:int):
-    room_id = str(uuid.uuid4())
     with engine.begin() as conn:
-        result_create = conn.execute(
+        result = conn.execute(
             text(
-                "INSERT INTO `room` (room_id, live_id, select_difficulity) VALUES (:room_id, :live_id, :select_difficulity)"
+                "INSERT INTO `room` (live_id, select_difficulity, member1) VALUES (:live_id, :select_difficulity, :member1)"
             ),
-            {"room_id": room_id, "live_id":live_id, "select_difficulity":select_difficulity},
+            {"live_id":live_id, "select_difficulity":select_difficulity, "member1":host_token},
         )
-        result_join = conn.execute(
-            text(
-                "INSERT INTO `room_member` (room_id, member1) VALUES (:room_id, :member1)"
-            ),
-            {"room_id":room_id, "member1":host_token}
-        )
-    return room_id
+    return result.lastrowid
 
-def _get_columns_from_room_by_live_id(conn, live_id:int) -> List[Optional[Room]]:
+def _get_oom_member_cnt_rom_room_by_live_id(conn, live_id:int) -> List[Optional[RoomListElement]]:
     result = conn.execute(
         text("SELECT * FROM `room` WHERE `live_id`=:live_id"),
         {"live_id": live_id},
     )
     try:
         rows = result.all()
-        info = [Room.from_orm(row) for row in rows]
-        return info
+        room_info_list = []
+        for row in rows:
+            joined_user_count = sum([1 if row[f"member{i}"] is not None else 0 for i in range(1,5)])
+            max_user_count = 4
+            room_info_list.append(
+                RoomListElement(room_id=row["room_id"], live_id=row["live_id"],
+                                joined_user_count=joined_user_count, max_user_count=max_user_count)
+            )
+        return room_info_list
     except NoResultFound:
         return None
 
-def _get_room_member_cnt_from_room_member_by_room_id(conn, room_id:str) -> int:
+def _join_as_room_member(conn, room_id:int, select_difficulty:int, member_num:int):
     result = conn.execute(
-        text("SELECT `member1`,`member2`,`member3`,`member4` FROM `room_member` WHERE `room_id`=:room_id"),
+        text("SELECT `member1`,`member2`,`member3`,`member4` FROM `room` WHERE `room_id`=:room_id"),
         {"room_id": room_id},
     )
+    
+
+    """
     try:
         row = result.one()
-        joined_user_count = sum([1 if row[f"member{i}"] is not None else 0 for i in range(1,5)])
-        return joined_user_count
-    except NoResultFound:
-        return None
 
-def _get_room_member_info_from_room_member_by_room_id_select_difficulty(conn, room_id:str, select_difficulty:int) -> int:
+
     result = conn.execute(
-        text("SELECT `member1`,`member2`,`member3`,`member4` FROM `room_member` WHERE `room_id`=:room_id AND `select_difficulty`=:select_difficulty "),
+        text("INSERT `member1`,`member2`,`member3`,`member4` FROM `room_member` WHERE `room_id`=:room_id AND `select_difficulty`=:select_difficulty "),
         {"room_id": room_id, "select_difficulty":select_difficulty},
     )
-    try:
-        row = result.one()
-        joined_user_count = sum([1 if row[f"member{i}"] is not None else 0 for i in range(1,5)])
-        return joined_user_count
-    except NoResultFound:
-        return None
-
+    conn.execute(
+            text(
+                "INSERT INTO `room_member` (room_id, member1) VALUES (:room_id, :member1)"
+            ),
+            {"room_id":room_id, "member1":host_token}
+        )
+"""
 
 def list_room(live_id:int) -> List[RoomListElement]:
     room_info_list = []
     with engine.begin() as conn:
-        room_info = _get_columns_from_room_by_live_id(conn, live_id)
-        for r_i in room_info:
-            room_id = r_i.room_id
-            joined_user_count = _get_room_member_cnt_from_room_member_by_room_id(conn, room_id)
-            max_user_count = 4
-            room_info_list.append(
-                RoomListElement(room_id=room_id, live_id=r_i.live_id, 
-                                joined_user_count=joined_user_count, max_user_count=max_user_count)
-            )
+        room_info_list = _get_oom_member_cnt_rom_room_by_live_id(conn, live_id)
+
     return room_info_list
 
 def join_room(room_id:str, select_difficulty:int) -> int:
     with engine.begin() as conn:
-        member_cnt = _get_room_member_info_from_room_member_by_room_id_select_difficulty(conn, room_id, select_difficulty)
-        if member_cnt < 4:
-
-            return 1
-        else:
-            return 0
+        _join_as_room_member(conn, room_id, select_difficulty)
+    

@@ -1,11 +1,13 @@
 from enum import Enum
+from select import select
+from typing import List
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from . import model
-from .model import SafeUser
+from .model import SafeUser, RoomListElement
 
 app = FastAPI()
 
@@ -35,6 +37,19 @@ class RoomCreateRequest(BaseModel):
 
 class RoomCreateResponse(BaseModel):
     room_id:str
+
+class RoomListRequest(BaseModel):
+    live_id:int
+
+class RoomListResponse(BaseModel):
+    room_info_list:List[RoomListElement]
+
+class RoomJoinRequest(BaseModel):
+    room_id:str
+    select_difficulty:int
+    
+class RoomJoinResponse(BaseModel):
+    join_room_result:int
 
 @app.post("/user/create", response_model=UserCreateResponse)
 def user_create(req: UserCreateRequest):
@@ -78,3 +93,12 @@ def update(req: UserCreateRequest, token: str = Depends(get_auth_token)):
 def room_create(req: RoomCreateRequest, token: str = Depends(get_auth_token)):
     room_id = model.create_room(token, req.live_id, req.select_difficulty)
     return RoomCreateResponse(room_id=room_id)
+
+@app.post("/room/list", response_model=RoomListResponse)
+def room_list(req: RoomListRequest):
+    room_info_list = model.list_room(req.live_id)
+    return RoomListResponse(room_info_list=room_info_list)
+
+@app.post("/room/join")
+def room_join(req: RoomJoinRequest):
+    pass

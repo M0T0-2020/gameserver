@@ -63,7 +63,7 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
     with engine.begin() as conn:
         # TODO: 実装
         try:
-            _id = _get_user_by_token(conn, token)["id"]
+            _id = _get_user_by_token(conn, token).id
             conn.execute(
                 text("UPDATE `user` SET name=:name, leader_card_id=:leader_card_id WHERE id=:id"),
                 {"name":name, "leader_card_id":leader_card_id, "id":_id},

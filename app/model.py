@@ -45,13 +45,14 @@ def _get_user_by_token(conn, token: str) -> Optional[SafeUser]:
     # TODO: 実装
     result = conn.execute(
         text("SELECT `id`, `name`, `leader_card_id` FROM `user` WHERE `token`=:token"),
-        {"token":token},
+        {"token": token},
     )
     try:
         row = result.one()
     except NoResultFound:
         return None
     return SafeUser.from_orm(row)
+
 
 def get_user_by_token(token: str) -> Optional[SafeUser]:
     with engine.begin() as conn:
@@ -65,8 +66,10 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
         try:
             _id = _get_user_by_token(conn, token).id
             conn.execute(
-                text("UPDATE `user` SET name=:name, leader_card_id=:leader_card_id WHERE id=:id"),
-                {"name":name, "leader_card_id":leader_card_id, "id":_id},
+                text(
+                    "UPDATE `user` SET name=:name, leader_card_id=:leader_card_id WHERE id=:id"
+                ),
+                {"name": name, "leader_card_id": leader_card_id, "id": _id},
             )
         except NoResultFound:
             return None

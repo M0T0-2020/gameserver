@@ -102,7 +102,7 @@ def create_room(host_token:str, live_id:int, select_difficulty:int):
         )
     return result.lastrowid
 
-def _get_oom_member_cnt_rom_room_by_live_id(conn, live_id:int) -> List[Optional[RoomListElement]]:
+def _get_room_member_cnt_rom_room_by_live_id(conn, live_id:int) -> List[Optional[RoomListElement]]:
     result = conn.execute(
         text("SELECT * FROM `room` WHERE `live_id`=:live_id"),
         {"live_id": live_id},
@@ -154,7 +154,7 @@ def _join_as_room_member(conn, room_id:int, token: str) -> int:
 def list_room(live_id:int) -> List[RoomListElement]:
     room_info_list = []
     with engine.begin() as conn:
-        room_info_list = _get_oom_member_cnt_rom_room_by_live_id(conn, live_id)
+        room_info_list = _get_room_member_cnt_rom_room_by_live_id(conn, live_id)
     return room_info_list
 
 def join_room(room_id:int, token:str) -> int:
@@ -169,6 +169,7 @@ def _get_user_info(conn, row) -> List[RoomUserListElement]:
         is_host = True if i == 1 else False
         member_token = row[f"member{i}"]
         if member_token is not None:
+            # ここは一度で持ってくる　高速化できる
             m_user = _get_user_by_token(conn, member_token)
             if m_user is not None:
                 user_info = RoomUserListElement(
@@ -177,7 +178,7 @@ def _get_user_info(conn, row) -> List[RoomUserListElement]:
                     name=m_user.name, leader_card_id=m_user.leader_card_id,
                     select_difficulty=select_difficulty, is_host=is_host
                 )
-                user_info_list.append(user_info)                
+                user_info_list.append(user_info)
     return user_info_list
 
 def _get_room_user_list(conn, room_id:str) -> List[RoomUserListElement]:

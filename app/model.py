@@ -62,7 +62,6 @@ def create_user(name: str, leader_card_id: int) -> str:
 def _get_user_by_token(conn, token: str) -> Optional[SafeUser]:
     # TODO: 実装
     result = conn.execute(
-    feature-make-room
         text("SELECT `id`, `name`, `leader_card_id` FROM `user` WHERE `token`=:token"),
         {"token": token},
     )

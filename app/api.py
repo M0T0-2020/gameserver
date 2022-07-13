@@ -1,5 +1,6 @@
 from enum import Enum
 from select import select
+import stat
 from typing import List
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -7,7 +8,13 @@ from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from . import model
-from .model import SafeUser, RoomListElement
+from .model import SafeUser
+from .ResReqModel import UserCreateRequest, UserCreateResponse
+from .ResReqModel import RoomCreateRequest, RoomCreateResponse
+from .ResReqModel import RoomListRequest, RoomListResponse
+from .ResReqModel import RoomJoinRequest, RoomJoinResponse
+from .ResReqModel import RoomWaitRequest, RoomWaitResponse
+
 
 app = FastAPI()
 
@@ -20,37 +27,6 @@ async def root():
 
 
 # User APIs
-
-
-class UserCreateRequest(BaseModel):
-    user_name: str
-    leader_card_id: int
-
-
-class UserCreateResponse(BaseModel):
-    user_token: str
-
-
-class RoomCreateRequest(BaseModel):
-    live_id:int
-    select_difficulty:int
-
-class RoomCreateResponse(BaseModel):
-    room_id:str
-
-class RoomListRequest(BaseModel):
-    live_id:int
-
-class RoomListResponse(BaseModel):
-    room_info_list:List[RoomListElement]
-
-class RoomJoinRequest(BaseModel):
-    room_id:str
-    select_difficulty:int
-
-class RoomJoinResponse(BaseModel):
-    join_room_result:int
-
 @app.post("/user/create", response_model=UserCreateResponse)
 def user_create(req: UserCreateRequest):
     """新規ユーザー作成"""
@@ -99,7 +75,12 @@ def room_list(req: RoomListRequest):
     room_info_list = model.list_room(req.live_id)
     return RoomListResponse(room_info_list=room_info_list)
 
-@app.post("/room/join")
+@app.post("/room/join", response_model=RoomJoinResponse)
 def room_join(req: RoomJoinRequest, token: str = Depends(get_auth_token)):
     join_room_result = model.join_room(req.room_id, token)
     return RoomJoinResponse(join_room_result=join_room_result)
+
+@app.post("/room/wait", response_model=RoomWaitResponse)
+def room_wait(req: RoomWaitRequest):
+    status, room_user_list = model.wait_room(req.room_id)
+    return RoomWaitResponse(status=status, room_user_list=room_user_list)

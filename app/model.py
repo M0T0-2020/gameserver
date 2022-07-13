@@ -1,6 +1,4 @@
-from ast import Not
 import json
-from lib2to3.pgen2.token import OP
 import uuid
 from enum import Enum, IntEnum
 from typing import Optional, List, Tuple
@@ -142,11 +140,18 @@ def _join_as_room_member(conn, room_id:int, token: str) -> int:
         members = [row[f"member{i}"] for i in range(1, MAX_USER_COUNT + 1) if row[f"member{i}"] is not None]
         absent_member_idx = [i for i in range(1, MAX_USER_COUNT + 1) if row[f"member{i}"] is None]
         joined_user_count = len(members)
-        if (joined_user_count < MAX_USER_COUNT) and (token not in members):
-            # 空いてる席に追加
-            new_member_num = joined_user_count + absent_member_idx[0]
-            return _insert_new_member(conn, room_id, new_member_num, token)
+        if joined_user_count == 0:
+            # 解散
+            return 3
+        elif joined_user_count < MAX_USER_COUNT:
+            if token not in members:
+                # 空いてる席に追加
+                new_member_num = joined_user_count + absent_member_idx[0]
+                return _insert_new_member(conn, room_id, new_member_num, token)
+            else:
+                return 1
         else:
+            # RoomFull
             return 2
     except NoResultFound:
         return 4
@@ -165,21 +170,27 @@ def join_room(room_id:int, token:str) -> int:
 def _get_user_info(conn, row) -> List[RoomUserListElement]:
     user_info_list = []
     select_difficulty = row["select_difficulty"]
-    for i in range(1,MAX_USER_COUNT + 1):
-        is_host = True if i == 1 else False
-        member_token = row[f"member{i}"]
-        if member_token is not None:
-            # ここは一度で持ってくる　高速化できる
-            m_user = _get_user_by_token(conn, member_token)
-            if m_user is not None:
-                user_info = RoomUserListElement(
-                    # user_id=member_token,
-                    user_id=i,
-                    name=m_user.name, leader_card_id=m_user.leader_card_id,
-                    select_difficulty=select_difficulty, is_host=is_host
+    try:
+        tokens = [row[f"member{i}"] for i in range(1,MAX_USER_COUNT + 1) if row[f"member{i}"] is not None]
+        if len(tokens) == 0:
+            # Dissolution
+            return 3, []
+        result = conn.execute(
+            text("SELECT `id`, `name`, `leader_card_id`, `token` FROM `user` WHERE `token` IN :tokens"),
+            {"tokens": tokens}
+            )
+        member_rows = result.all()
+        for row in member_rows:
+            user_info_list.append(
+                RoomUserListElement(
+                    user_id=tokens.index(row["token"]), name=row["name"],
+                    leader_card_id=row["leader_card_id"], select_difficulty=select_difficulty,
+                    is_host=row["token"] == tokens[0]
                 )
-                user_info_list.append(user_info)
-    return user_info_list
+            )
+        return user_info_list
+    except NoResultFound:
+        return None
 
 def _get_room_user_list(conn, room_id:str) -> List[RoomUserListElement]:
     try:
@@ -190,12 +201,15 @@ def _get_room_user_list(conn, room_id:str) -> List[RoomUserListElement]:
         row = result.one()
         user_info_list = _get_user_info(conn, row)
 
-        if len(user_info_list) != MAX_USER_COUNT:
-            status = 1
+        if len(user_info_list) == 0:
+            # Dissolution
+            status = 3
         elif len(user_info_list) == MAX_USER_COUNT:
+            # LiveStart
             status = 2
         else:
-            status = 3
+            # Waiting
+            status = 1
         return status, user_info_list
     except NoResultFound:
         return None

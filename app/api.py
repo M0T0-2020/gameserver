@@ -47,7 +47,7 @@ class RoomListResponse(BaseModel):
 class RoomJoinRequest(BaseModel):
     room_id:str
     select_difficulty:int
-    
+
 class RoomJoinResponse(BaseModel):
     join_room_result:int
 
@@ -100,5 +100,6 @@ def room_list(req: RoomListRequest):
     return RoomListResponse(room_info_list=room_info_list)
 
 @app.post("/room/join")
-def room_join(req: RoomJoinRequest):
-    pass
+def room_join(req: RoomJoinRequest, token: str = Depends(get_auth_token)):
+    join_room_result = model.join_room(req.room_id, token)
+    return RoomJoinResponse(join_room_result=join_room_result)

@@ -17,7 +17,7 @@ CREATE TABLE `room` (
   `member2` varchar(255) DEFAULT NULL,
   `member3` varchar(255) DEFAULT NULL,
   `member4` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`room_id`)
+  PRIMARY KEY (`room_id`),
   UNIQUE KEY `room_id` (`room_id`)
 
 );

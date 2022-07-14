@@ -10,8 +10,13 @@ from sqlalchemy.exc import NoResultFound
 
 from .db import engine
 from .config import MAX_USER_COUNT
-from ResReqModel import LiveDifficulty, WaitRoomStatus, JoinRoomResult
-
+from .ResReqModel import (
+    LiveDifficulty,
+    WaitRoomStatus,
+    JoinRoomResult,
+    RoomListElement,
+    RoomUserListElement
+)
 
 class InvalidToken(Exception):
     """指定されたtokenが不正だったときに投げる"""
@@ -26,22 +31,6 @@ class SafeUser(BaseModel):
 
     class Config:
         orm_mode = True
-
-class RoomListElement(BaseModel):
-    room_id:int
-    live_id:int
-    joined_user_count:int
-    max_user_count:int
-
-    class Config:
-        orm_mode = True
-
-class RoomUserListElement(BaseModel):
-    user_id:int
-    name:str
-    leader_card_id:int
-    select_difficulty: LiveDifficulty
-    is_host:bool
 
 def create_user(name: str, leader_card_id: int) -> str:
     """Create new user and returns their token"""
@@ -90,14 +79,14 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
         except NoResultFound:
             return None
 
-def create_room(host_token:str, live_id:int, select_difficulty:int):
-    assert select_difficulty == 1 or select_difficulty == 2
+def create_room(host_token:str, live_id:int, select_difficulty:LiveDifficulty):
+    assert select_difficulty == LiveDifficulty.Normal or select_difficulty == LiveDifficulty.Hard
     with engine.begin() as conn:
         result = conn.execute(
             text(
-                "INSERT INTO `room` (live_id, select_difficulty, member1) VALUES (:live_id, :select_difficulty, :member1)"
+                "INSERT INTO `room` (live_id, select_difficulty, status, member1, owner) VALUES (:live_id, :select_difficulty, :status, :member1, :member1)"
             ),
-            {"live_id":live_id, "select_difficulty":select_difficulty, "member1":host_token},
+            {"live_id":live_id, "select_difficulty":select_difficulty.value, "status":WaitRoomStatus.Waiting.value, "member1":host_token},
         )
     return result.lastrowid
 
@@ -168,6 +157,8 @@ def join_room(room_id:int, token:str) -> int:
 
 def _get_user_info(conn, row) -> List[RoomUserListElement]:
     user_info_list = []
+    # status = row["status"]
+    host = row["owner"]
     select_difficulty = LiveDifficulty.Normal if row["select_difficulty"] == 1 else LiveDifficulty.Hard
     try:
         tokens = [row[f"member{i}"] for i in range(1,MAX_USER_COUNT + 1) if row[f"member{i}"] is not None]
@@ -185,7 +176,7 @@ def _get_user_info(conn, row) -> List[RoomUserListElement]:
                     user_id=tokens.index(row["token"]), name=row["name"],
                     leader_card_id=row["leader_card_id"], select_difficulty=select_difficulty,
                     # ここのホストの部分はよく考える必要がある
-                    is_host=row["token"] == tokens[0]
+                    is_host=row["token"] == host
                 )
             )
         return user_info_list

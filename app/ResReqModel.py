@@ -1,7 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel
 from typing import List
-from .model import RoomListElement, RoomUserListElement
 
 # Request(BaseModel):
 # Response(BaseModel):
@@ -28,6 +27,21 @@ class WaitRoomStatus(Enum):
     # 解散された
     Dissolution = 3
 
+class RoomListElement(BaseModel):
+    room_id:int
+    live_id:int
+    joined_user_count:int
+    max_user_count:int
+
+    class Config:
+        orm_mode = True
+
+class RoomUserListElement(BaseModel):
+    user_id:int
+    name:str
+    leader_card_id:int
+    select_difficulty: LiveDifficulty
+    is_host:bool
 
 class UserCreateRequest(BaseModel):
     user_name: str

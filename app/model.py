@@ -14,8 +14,8 @@ from .ResReqModel import (
     LiveDifficulty,
     WaitRoomStatus,
     JoinRoomResult,
-    RoomListElement,
-    RoomUserListElement
+    RoomInfo,
+    RoomUser
 )
 
 class InvalidToken(Exception):
@@ -90,7 +90,7 @@ def create_room(host_token:str, live_id:int, select_difficulty:LiveDifficulty):
         )
     return result.lastrowid
 
-def _get_room_member_cnt_rom_room_by_live_id(conn, live_id:int) -> List[Optional[RoomListElement]]:
+def _get_room_member_cnt_rom_room_by_live_id(conn, live_id:int) -> List[Optional[RoomInfo]]:
     result = conn.execute(
         text("SELECT * FROM `room` WHERE `live_id`=:live_id"),
         {"live_id": live_id},
@@ -102,14 +102,14 @@ def _get_room_member_cnt_rom_room_by_live_id(conn, live_id:int) -> List[Optional
             joined_user_count = sum([1 if row[f"member{i}"] is not None else 0 for i in range(1,MAX_USER_COUNT + 1)])
             max_user_count = MAX_USER_COUNT
             room_info_list.append(
-                RoomListElement(room_id=row["room_id"], live_id=row["live_id"],
-                                joined_user_count=joined_user_count, max_user_count=max_user_count)
+                RoomInfo(room_id=row["room_id"], live_id=row["live_id"],
+                         joined_user_count=joined_user_count, max_user_count=max_user_count)
             )
         return room_info_list
     except NoResultFound:
         return None
 
-def list_room(live_id:int) -> List[RoomListElement]:
+def list_room(live_id:int) -> List[RoomInfo]:
     room_info_list = []
     with engine.begin() as conn:
         room_info_list = _get_room_member_cnt_rom_room_by_live_id(conn, live_id)
@@ -155,7 +155,7 @@ def join_room(room_id:int, token:str) -> int:
         status = _join_as_room_member(conn, room_id, token)
     return status
 
-def _get_user_info(conn, row) -> List[RoomUserListElement]:
+def _get_user_info(conn, row, req_token) -> List[RoomUser]:
     user_info_list = []
     # status = row["status"]
     host = row["owner"]
@@ -172,9 +172,10 @@ def _get_user_info(conn, row) -> List[RoomUserListElement]:
         member_rows = result.all()
         for row in member_rows:
             user_info_list.append(
-                RoomUserListElement(
+                RoomUser(
                     user_id=tokens.index(row["token"]), name=row["name"],
                     leader_card_id=row["leader_card_id"], select_difficulty=select_difficulty,
+                    is_me=row["token"] == req_token,
                     # ここのホストの部分はよく考える必要がある
                     is_host=row["token"] == host
                 )
@@ -183,14 +184,14 @@ def _get_user_info(conn, row) -> List[RoomUserListElement]:
     except NoResultFound:
         return None
 
-def _get_room_user_list(conn, room_id:str) -> List[RoomUserListElement]:
+def _get_room_user_list(conn, room_id:str, token:str) -> List[RoomUser]:
     try:
         result = conn.execute(
-            text("SELECT `member1`,`member2`,`member3`,`member4`, `select_difficulty` FROM `room` WHERE `room_id`=:room_id"),
+            text("SELECT `member1`,`member2`,`member3`,`member4`, `select_difficulty`, `owner` FROM `room` WHERE `room_id`=:room_id"),
             {"room_id": room_id}
         )
         row = result.one()
-        user_info_list = _get_user_info(conn, row)
+        user_info_list = _get_user_info(conn, row, token)
 
         if len(user_info_list) == 0:
             # Dissolution
@@ -207,7 +208,25 @@ def _get_room_user_list(conn, room_id:str) -> List[RoomUserListElement]:
     except NoResultFound:
         return None
 
-def wait_room(room_id:int) -> Tuple[WaitRoomStatus, RoomUserListElement]:
+def wait_room(room_id:int, token:str) -> Tuple[WaitRoomStatus, List[RoomUser]]:
     with engine.begin() as conn:
-        status, room_user_list = _get_room_user_list(conn, room_id)
+        status, room_user_list = _get_room_user_list(conn, room_id, token)
     return status, room_user_list
+
+def start_room(room_id:int, token) -> None:
+    with engine.begin() as conn:
+        try:
+            result = conn.execute(
+                text("SELECT `owner` FROM `room` WHERE `room_id`=:room_id"),
+                {"room_id": room_id}
+            )
+            if token == result.one()["owner"]:
+                result = conn.execute(
+                    text("UPDATE `room` SET `status`=:status WHERE `room_id`=:room_id"),
+                    {"status": WaitRoomStatus.LiveStart.value, "room_id": room_id}
+                )
+            else:
+                print("owner is diffrent!!")
+                raise Exception
+        except NoResultFound as e:
+            raise e

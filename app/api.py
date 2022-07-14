@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from . import model
 from .model import SafeUser
-from .ResReqModel import UserCreateRequest, UserCreateResponse
+from .ResReqModel import RoomStartRequest, RoomStartResponse, UserCreateRequest, UserCreateResponse
 from .ResReqModel import RoomCreateRequest, RoomCreateResponse
 from .ResReqModel import RoomListRequest, RoomListResponse
 from .ResReqModel import RoomJoinRequest, RoomJoinResponse
@@ -81,6 +81,11 @@ def room_join(req: RoomJoinRequest, token: str = Depends(get_auth_token)):
     return RoomJoinResponse(join_room_result=join_room_result)
 
 @app.post("/room/wait", response_model=RoomWaitResponse)
-def room_wait(req: RoomWaitRequest):
-    status, room_user_list = model.wait_room(req.room_id)
+def room_wait(req: RoomWaitRequest, token: str = Depends(get_auth_token)):
+    status, room_user_list = model.wait_room(req.room_id, token)
     return RoomWaitResponse(status=status, room_user_list=room_user_list)
+
+@app.post("/room/start", response_model=RoomStartResponse)
+def room_start(req: RoomStartRequest, token: str = Depends(get_auth_token)):
+    model.start_room(req.room_id, token)
+    return RoomStartResponse()

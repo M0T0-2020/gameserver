@@ -27,7 +27,7 @@ class WaitRoomStatus(Enum):
     # 解散された
     Dissolution = 3
 
-class RoomListElement(BaseModel):
+class RoomInfo(BaseModel):
     room_id:int
     live_id:int
     joined_user_count:int
@@ -36,11 +36,12 @@ class RoomListElement(BaseModel):
     class Config:
         orm_mode = True
 
-class RoomUserListElement(BaseModel):
+class RoomUser(BaseModel):
     user_id:int
     name:str
     leader_card_id:int
     select_difficulty: LiveDifficulty
+    is_me:bool
     is_host:bool
 
 class UserCreateRequest(BaseModel):
@@ -62,7 +63,7 @@ class RoomListRequest(BaseModel):
     live_id:int
 
 class RoomListResponse(BaseModel):
-    room_info_list:List[RoomListElement]
+    room_info_list:List[RoomInfo]
 
 class RoomJoinRequest(BaseModel):
     room_id:int
@@ -76,4 +77,10 @@ class RoomWaitRequest(BaseModel):
 
 class RoomWaitResponse(BaseModel):
     status:WaitRoomStatus
-    room_user_list:List[RoomUserListElement]
+    room_user_list:List[RoomUser]
+
+class RoomStartRequest(BaseModel):
+    room_id:int
+
+class RoomStartResponse(BaseModel):
+    pass

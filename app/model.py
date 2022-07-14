@@ -1,7 +1,7 @@
 import json
 import uuid
 from enum import Enum, IntEnum
-from typing import Optional, List, Tuple
+from typing import Optional, Tuple
 
 from fastapi import HTTPException
 from pydantic import BaseModel
@@ -90,7 +90,7 @@ def create_room(host_token:str, live_id:int, select_difficulty:LiveDifficulty):
         )
     return result.lastrowid
 
-def _get_room_member_cnt_rom_room_by_live_id(conn, live_id:int) -> List[Optional[RoomInfo]]:
+def _get_room_member_cnt_rom_room_by_live_id(conn, live_id:int) -> list[Optional[RoomInfo]]:
     result = conn.execute(
         text("SELECT * FROM `room` WHERE `live_id`=:live_id"),
         {"live_id": live_id},
@@ -109,7 +109,7 @@ def _get_room_member_cnt_rom_room_by_live_id(conn, live_id:int) -> List[Optional
     except NoResultFound:
         return None
 
-def list_room(live_id:int) -> List[RoomInfo]:
+def list_room(live_id:int) -> list[RoomInfo]:
     room_info_list = []
     with engine.begin() as conn:
         room_info_list = _get_room_member_cnt_rom_room_by_live_id(conn, live_id)
@@ -155,16 +155,16 @@ def join_room(room_id:int, token:str) -> int:
         status = _join_as_room_member(conn, room_id, token)
     return status
 
-def _get_user_info(conn, row, req_token) -> List[RoomUser]:
+def _get_user_info(conn, row, req_token) -> Tuple[WaitRoomStatus, list[RoomUser]]:
     user_info_list = []
-    # status = row["status"]
+    status = WaitRoomStatus(row["status"])
     host = row["owner"]
     select_difficulty = LiveDifficulty.Normal if row["select_difficulty"] == 1 else LiveDifficulty.Hard
     try:
         token_user_id_dict = {row[f"member{i}"]: i for i in range(1,MAX_USER_COUNT + 1) if row[f"member{i}"] is not None}
         if len(token_user_id_dict.values()) == 0:
             # Dissolution
-            return []
+            return status, []
         result = conn.execute(
             text("SELECT `id`, `name`, `leader_card_id`, `token` FROM `user` WHERE `token` IN :tokens"),
             {"tokens": list(token_user_id_dict.keys())}
@@ -180,33 +180,23 @@ def _get_user_info(conn, row, req_token) -> List[RoomUser]:
                     is_host=row["token"] == host
                 )
             )
-        return user_info_list
+        return status, user_info_list
     except NoResultFound:
         return None
 
-def _get_room_user_list(conn, room_id:str, token:str) -> List[RoomUser]:
+def _get_room_user_list(conn, room_id:str, token:str) -> Tuple[WaitRoomStatus, list[RoomUser]]:
     try:
         result = conn.execute(
             text("SELECT `member1`,`member2`,`member3`,`member4`, `select_difficulty`, `owner`, `status` FROM `room` WHERE `room_id`=:room_id"),
             {"room_id": room_id}
         )
         row = result.one()
-        user_info_list = _get_user_info(conn, row, token)
-
-        if WaitRoomStatus(row["status"]) == WaitRoomStatus.Dissolution:
-            # Dissolution
-            status = WaitRoomStatus.Dissolution
-        elif WaitRoomStatus(row["status"]) == WaitRoomStatus.Waiting:
-            # Waiting
-            status = WaitRoomStatus.Waiting
-        else:
-            # LiveStart
-            status = WaitRoomStatus.LiveStart
+        status, user_info_list = _get_user_info(conn, row, token)
         return status, user_info_list
     except NoResultFound:
         return None
 
-def wait_room(room_id:int, token:str) -> Tuple[WaitRoomStatus, List[RoomUser]]:
+def wait_room(room_id:int, token:str) -> Tuple[WaitRoomStatus, list[RoomUser]]:
     with engine.begin() as conn:
         status, room_user_list = _get_room_user_list(conn, room_id, token)
     return status, room_user_list
@@ -262,7 +252,7 @@ def _get_user_id_from_result(conn, room_id:int, token:str) -> int:
         return None
     return None
 
-def _update_myresult_by_user_id(conn, room_id:int, user_id:int, score:int, judge_count_list:List[int]):
+def _update_myresult_by_user_id(conn, room_id:int, user_id:int, score:int, judge_count_list:list[int]):
     try:
         judge_count_join = ", ".join(map(str,judge_count_list))
         conn.execute(
@@ -274,7 +264,10 @@ def _update_myresult_by_user_id(conn, room_id:int, user_id:int, score:int, judge
     except NoResultFound:
         return None
 
-def end_room(room_id:int, score:int, judge_count_list:List[int], token) -> None:
+def end_room(room_id:int, score:int, judge_count_list:list[int], token) -> None:
     with engine.begin() as conn:
         user_id = _get_user_id_from_result(conn, room_id, token)
         _update_myresult_by_user_id(conn, room_id, user_id, score, judge_count_list)
+
+def result_rooom(room_id:int, token:str) -> None:
+    pass

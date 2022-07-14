@@ -79,31 +79,43 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
         except NoResultFound:
             return None
 
+# create room
 def create_room(host_token:str, live_id:int, select_difficulty:LiveDifficulty):
     assert select_difficulty == LiveDifficulty.Normal or select_difficulty == LiveDifficulty.Hard
     with engine.begin() as conn:
         result = conn.execute(
             text(
-                "INSERT INTO `room` (live_id, select_difficulty, status, member1, owner) VALUES (:live_id, :select_difficulty, :status, :member1, :member1)"
+                "INSERT INTO `room` (live_id, select_difficulty, status, owner) VALUES (:live_id, :select_difficulty, :status, :member1)"
             ),
             {"live_id":live_id, "select_difficulty":select_difficulty.value, "status":WaitRoomStatus.Waiting.value, "member1":host_token},
         )
-    return result.lastrowid
+        room_id = result.lastrowid
+        conn.execute(
+            text(
+                "INSERT INTO `room_member` (room_id) VALUES (:room_id)"
+            ),
+            {"room_id":room_id},
+        )
+    return 
 
+# list_room
 def _get_room_member_cnt_rom_room_by_live_id(conn, live_id:int) -> list[Optional[RoomInfo]]:
-    result = conn.execute(
-        text("SELECT * FROM `room` WHERE `live_id`=:live_id"),
-        {"live_id": live_id},
-    )
     try:
-        rows = result.all()
+        rows = conn.execute(
+            text("SELECT `room_id` FROM `room` WHERE `live_id`=:live_id"),
+            {"live_id": live_id}
+        ).all()
+        room_ids = [row["room_id"] for row in rows]
+        result = conn.execute(
+            text("SELECT `room_id`, count(`user_id`) FROM `room_member` WHERE `room_id` IN :room_ids GROUP BY `room_id`"),
+            {"room_ids": room_ids}
+        )
         room_info_list = []
         for row in rows:
             joined_user_count = sum([1 if row[f"member{i}"] is not None else 0 for i in range(1,MAX_USER_COUNT + 1)])
-            max_user_count = MAX_USER_COUNT
             room_info_list.append(
                 RoomInfo(room_id=row["room_id"], live_id=row["live_id"],
-                         joined_user_count=joined_user_count, max_user_count=max_user_count)
+                         joined_user_count=joined_user_count, max_user_count=MAX_USER_COUNT)
             )
         return room_info_list
     except NoResultFound:

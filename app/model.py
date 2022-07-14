@@ -10,6 +10,7 @@ from sqlalchemy.exc import NoResultFound
 
 from .db import engine
 from .config import MAX_USER_COUNT
+from ResReqModel import LiveDifficulty, WaitRoomStatus, JoinRoomResult
 
 
 class InvalidToken(Exception):
@@ -27,7 +28,7 @@ class SafeUser(BaseModel):
         orm_mode = True
 
 class RoomListElement(BaseModel):
-    room_id:str
+    room_id:int
     live_id:int
     joined_user_count:int
     max_user_count:int
@@ -36,10 +37,10 @@ class RoomListElement(BaseModel):
         orm_mode = True
 
 class RoomUserListElement(BaseModel):
-    user_id:str
+    user_id:int
     name:str
     leader_card_id:int
-    select_difficulty: int
+    select_difficulty: LiveDifficulty
     is_host:bool
 
 def create_user(name: str, leader_card_id: int) -> str:
@@ -119,16 +120,21 @@ def _get_room_member_cnt_rom_room_by_live_id(conn, live_id:int) -> List[Optional
     except NoResultFound:
         return None
 
+def list_room(live_id:int) -> List[RoomListElement]:
+    room_info_list = []
+    with engine.begin() as conn:
+        room_info_list = _get_room_member_cnt_rom_room_by_live_id(conn, live_id)
+    return room_info_list
 
-def _insert_new_member(conn, room_id:int, member_num:int, token:str) -> int:
+def _insert_new_member(conn, room_id:int, member_num:int, token:str) -> JoinRoomResult:
     try:
         conn.execute(
             text(f"UPDATE `room` SET `member{member_num}`=:member_token WHERE `room_id`=:room_id"),
             {"room_id": room_id, "member_token":token}
         )
-        return 1
+        return JoinRoomResult.Ok
     except NoResultFound:
-        return 4
+        return JoinRoomResult.OtherError
 
 def _join_as_room_member(conn, room_id:int, token: str) -> int:
     try:
@@ -142,24 +148,18 @@ def _join_as_room_member(conn, room_id:int, token: str) -> int:
         joined_user_count = len(members)
         if joined_user_count == 0:
             # 解散
-            return 3
+            return JoinRoomResult.Disbanded
         elif joined_user_count < MAX_USER_COUNT:
             if token not in members:
                 # 空いてる席に追加
                 return _insert_new_member(conn, room_id, absent_member_idx[0], token)
             else:
-                return 1
+                return JoinRoomResult.Ok
         else:
             # RoomFull
-            return 2
+            return JoinRoomResult.RoomFull
     except NoResultFound:
-        return 4
-
-def list_room(live_id:int) -> List[RoomListElement]:
-    room_info_list = []
-    with engine.begin() as conn:
-        room_info_list = _get_room_member_cnt_rom_room_by_live_id(conn, live_id)
-    return room_info_list
+        return JoinRoomResult.OtherError
 
 def join_room(room_id:int, token:str) -> int:
     with engine.begin() as conn:
@@ -168,22 +168,23 @@ def join_room(room_id:int, token:str) -> int:
 
 def _get_user_info(conn, row) -> List[RoomUserListElement]:
     user_info_list = []
-    select_difficulty = row["select_difficulty"]
+    select_difficulty = LiveDifficulty.Normal if row["select_difficulty"] == 1 else LiveDifficulty.Hard
     try:
         tokens = [row[f"member{i}"] for i in range(1,MAX_USER_COUNT + 1) if row[f"member{i}"] is not None]
         if len(tokens) == 0:
             # Dissolution
-            return 3, []
+            return []
         result = conn.execute(
             text("SELECT `id`, `name`, `leader_card_id`, `token` FROM `user` WHERE `token` IN :tokens"),
             {"tokens": tokens}
-            )
+        )
         member_rows = result.all()
         for row in member_rows:
             user_info_list.append(
                 RoomUserListElement(
                     user_id=tokens.index(row["token"]), name=row["name"],
                     leader_card_id=row["leader_card_id"], select_difficulty=select_difficulty,
+                    # ここのホストの部分はよく考える必要がある
                     is_host=row["token"] == tokens[0]
                 )
             )
@@ -202,18 +203,20 @@ def _get_room_user_list(conn, room_id:str) -> List[RoomUserListElement]:
 
         if len(user_info_list) == 0:
             # Dissolution
-            status = 3
+            status = WaitRoomStatus.Dissolution
+        else:
+            # Waiting
+            status = WaitRoomStatus.Waiting
+        """
         elif len(user_info_list) == MAX_USER_COUNT:
             # LiveStart
             status = 2
-        else:
-            # Waiting
-            status = 1
+        """
         return status, user_info_list
     except NoResultFound:
         return None
 
-def wait_room(room_id:int) -> Tuple[int, RoomUserListElement]:
+def wait_room(room_id:int) -> Tuple[WaitRoomStatus, RoomUserListElement]:
     with engine.begin() as conn:
         status, room_user_list = _get_room_user_list(conn, room_id)
     return status, room_user_list

@@ -161,19 +161,19 @@ def _get_user_info(conn, row, req_token) -> List[RoomUser]:
     host = row["owner"]
     select_difficulty = LiveDifficulty.Normal if row["select_difficulty"] == 1 else LiveDifficulty.Hard
     try:
-        tokens = [row[f"member{i}"] for i in range(1,MAX_USER_COUNT + 1) if row[f"member{i}"] is not None]
-        if len(tokens) == 0:
+        token_user_id_dict = {row[f"member{i}"]: i for i in range(1,MAX_USER_COUNT + 1) if row[f"member{i}"] is not None}
+        if len(token_user_id_dict.values()) == 0:
             # Dissolution
             return []
         result = conn.execute(
             text("SELECT `id`, `name`, `leader_card_id`, `token` FROM `user` WHERE `token` IN :tokens"),
-            {"tokens": tokens}
+            {"tokens": list(token_user_id_dict.keys())}
         )
         member_rows = result.all()
         for row in member_rows:
             user_info_list.append(
                 RoomUser(
-                    user_id=tokens.index(row["token"]), name=row["name"],
+                    user_id=token_user_id_dict[row["token"]], name=row["name"],
                     leader_card_id=row["leader_card_id"], select_difficulty=select_difficulty,
                     is_me=row["token"] == req_token,
                     # ここのホストの部分はよく考える必要がある
@@ -247,5 +247,33 @@ def start_room(room_id:int, token:str) -> None:
         except NoResultFound as e:
             raise e
 
+def _get_user_id_from_result(conn, room_id:int, token:str) -> int:
+    try:
+        result = conn.execute(
+            text("SELECT `member1`,`member2`,`member3`,`member4` FROM `result` WHERE `room_id`=:room_id"),
+            {"room_id": room_id}
+        )
+        row = result.one()
+        for i in range(1, 1 + MAX_USER_COUNT):
+            if token == row[f"member{i}"]:
+                return i
+    except NoResultFound:
+        return None
+    return None
+
+def _update_myresult_by_user_id(conn, room_id:int, user_id:int, score:int, judge_count_list:List[int]):
+    try:
+        judge_count_join = ", ".join(map(str,judge_count_list))
+        conn.execute(
+            text(
+                f"UPDATE `result` SET score{user_id}=:score, judge_count_list{user_id}=:judge_count WHERE room_id=:room_id"
+            ),
+            {"room_id": room_id, "score": score, "judge_count":judge_count_join},
+        )
+    except NoResultFound:
+        return None
+
 def end_room(room_id:int, score:int, judge_count_list:List[int], token) -> None:
-    pass
+    with engine.begin() as conn:
+        user_id = _get_user_id_from_result(conn, room_id, token)
+        _update_myresult_by_user_id(conn, room_id, user_id, score, judge_count_list)

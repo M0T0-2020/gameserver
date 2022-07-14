@@ -307,7 +307,7 @@ def _get_result_user_list(conn, room_id) -> list[ResultUser]:
     except NoResultFound:
         return None
 
-def result_rooom(room_id:int) -> None:
+def result_room(room_id:int) -> None:
     with engine.begin() as conn:
         result_user_list = _get_result_user_list(conn, room_id)
     return result_user_list

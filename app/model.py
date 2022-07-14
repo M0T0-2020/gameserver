@@ -349,14 +349,15 @@ def _sample_room_member_id(conn, room_id: int, leave_room_user_id: int):
     try:
         result = conn.execute(
             text(
-                "SELECT `member1`,`member2`,`member3`,`member4` FROM `room` WHERE `room_id`=:room_id"
+                "SELECT member_id FROM `member` WHERE `room_id`=:room_id"
             ),
             {"room_id": room_id},
         )
-        row = result.one()
-        for i in range(1, MAX_USER_COUNT + 1):
-            if (i != leave_room_user_id) and (row[f"member{i}"] is not None):
-                return row[f"member{i}"]
+        rows = result.all()
+        for row in rows:
+            if row["member"] is not None:
+                if row["member_id"] != leave_room_user_id:
+                    return row["member_id"]
         return "none"
     except NoResultFound:
         return None
@@ -368,6 +369,7 @@ def _leave_room_by_user_id(conn, room_id: int, leave_room_user_id: int, is_owner
             new_owner = _sample_room_member_id(conn, room_id, leave_room_user_id)
             print(f"new_owner {new_owner}")
             if new_owner != "none":
+                # DELETEしてownerをあたらしくする
                 conn.execute(
                     text(
                         f"UPDATE `room` SET member{leave_room_user_id}=NULL, owner=:new_owner WHERE room_id=:room_id"
@@ -387,8 +389,9 @@ def _leave_room_by_user_id(conn, room_id: int, leave_room_user_id: int, is_owner
                 )
         else:
             conn.execute(
+                # DELETE
                 text(
-                    f"UPDATE `room` SET member{leave_room_user_id}=NULL WHERE room_id=:room_id"
+                    f"UPDATE `member` SET member=NULL WHERE room_id=:room_id AND u"
                 ),
                 {"room_id": room_id},
             )
@@ -402,14 +405,12 @@ def _get_room_user_id_from_room(conn, room_id: int, token: str) -> Tuple[int, bo
         user_id = _get_user_by_token(conn, token).id
         result = conn.execute(
             text(
-                "SELECT `member1`,`member2`,`member3`,`member4`, `owner` FROM `room` WHERE `room_id`=:room_id"
+                "SELECT owner FROM `room` WHERE `room_id`=:room_id"
             ),
             {"room_id": room_id},
         )
         row = result.one()
-        for i in range(1, 1 + MAX_USER_COUNT):
-            if user_id == row[f"member{i}"]:
-                return i, user_id == row["owner"]
+        return user_id, user_id == row["owner"]
     except NoResultFound:
         return None
     return None
@@ -417,5 +418,5 @@ def _get_room_user_id_from_room(conn, room_id: int, token: str) -> Tuple[int, bo
 
 def leave_room(room_id: int, token: str) -> None:
     with engine.begin() as conn:
-        room_user_id, is_owner = _get_room_user_id_from_room(conn, room_id, token)
-        _leave_room_by_user_id(conn, room_id, room_user_id, is_owner)
+        user_id, is_owner = _get_room_user_id_from_room(conn, room_id, token)
+        _leave_room_by_user_id(conn, room_id, user_id, is_owner)

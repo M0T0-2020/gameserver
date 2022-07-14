@@ -12,6 +12,7 @@ from .db import engine
 from .config import MAX_USER_COUNT
 from .ResReqModel import (
     LiveDifficulty,
+    ResultUser,
     WaitRoomStatus,
     JoinRoomResult,
     RoomInfo,
@@ -91,11 +92,11 @@ def create_room(host_token:str, live_id:int, select_difficulty:LiveDifficulty):
     return result.lastrowid
 
 def _get_room_member_cnt_rom_room_by_live_id(conn, live_id:int) -> list[Optional[RoomInfo]]:
-    result = conn.execute(
-        text("SELECT * FROM `room` WHERE `live_id`=:live_id"),
-        {"live_id": live_id},
-    )
     try:
+        result = conn.execute(
+            text("SELECT * FROM `room` WHERE `live_id`=:live_id"),
+            {"live_id": live_id}
+        )
         rows = result.all()
         room_info_list = []
         for row in rows:
@@ -269,5 +270,39 @@ def end_room(room_id:int, score:int, judge_count_list:list[int], token) -> None:
         user_id = _get_user_id_from_result(conn, room_id, token)
         _update_myresult_by_user_id(conn, room_id, user_id, score, judge_count_list)
 
-def result_rooom(room_id:int, token:str) -> None:
-    pass
+def check_can_return(row):
+    member_num = row["member_num"]
+    scores = [row[f"score{i}"] for i in range(1,MAX_USER_COUNT + 1) if row[f"score{i}"] is not None]
+    return member_num != len(scores)
+
+def _get_result_user_list_from_row(row) -> list[ResultUser]:
+    if check_can_return(row):
+        return []
+    resultuser_list = []
+    user_ids = [row[f"member{i}"] for i in range(1, MAX_USER_COUNT + 1) if row[f"score{i}"] is not None]
+    scores = [row[f"score{i}"] for i in range(1,MAX_USER_COUNT + 1) if row[f"score{i}"] is not None]
+    judge_count_lists = [row[f"judge_count_list{i}"].split(", ") for i in range(1,MAX_USER_COUNT + 1) if row[f"judge_count_list{i}"] is not None]
+    # sort
+    judge_count_lists = [sorted(judge_count_list) for judge_count_list in judge_count_lists]
+    for u_id, score, judge_count_list in zip(user_ids, scores, judge_count_lists):
+        resultuser_list.append(
+            ResultUser(user_id=u_id, judge_count_list=judge_count_list, score=score)
+        )
+    return resultuser_list
+
+
+def _get_result_user_list(conn, room_id) -> list[ResultUser]:
+    try:
+        result = conn.execute(
+            text("SELECT * FROM `result` WHERE `room_id`=:room_id"),
+            {"room_id": room_id}
+        )
+        row = result.one()
+        return _get_result_user_list_from_row(row)
+    except NoResultFound:
+        return None
+
+def result_rooom(room_id:int) -> None:
+    with engine.begin() as conn:
+        result_user_list = _get_result_user_list(conn, room_id)
+    return result_user_list

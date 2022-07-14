@@ -21,7 +21,6 @@ CREATE TABLE `room` (
   `owner` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`room_id`),
   UNIQUE KEY `room_id` (`room_id`)
-
 );
 
 DROP TABLE IF EXISTS `result`;

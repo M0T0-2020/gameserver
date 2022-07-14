@@ -1,7 +1,6 @@
 import json
 import uuid
 from enum import Enum, IntEnum
-from lib2to3.pgen2.token import RPAR
 from typing import Optional, Tuple
 
 from fastapi import HTTPException

@@ -44,7 +44,7 @@ class RoomUser(BaseModel):
     is_host:bool
 
 class ResultUser(BaseModel):
-    user_id:str
+    user_id:int
     judge_count_list:list[int]
     score:int
 

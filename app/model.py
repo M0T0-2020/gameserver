@@ -83,11 +83,12 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
 def create_room(host_token:str, live_id:int, select_difficulty:LiveDifficulty):
     assert select_difficulty == LiveDifficulty.Normal or select_difficulty == LiveDifficulty.Hard
     with engine.begin() as conn:
+        user_id = _get_user_by_token(conn, host_token).id
         result = conn.execute(
             text(
                 "INSERT INTO `room` (live_id, select_difficulty, status, member1, owner) VALUES (:live_id, :select_difficulty, :status, :member1, :member1)"
             ),
-            {"live_id":live_id, "select_difficulty":select_difficulty.value, "status":WaitRoomStatus.Waiting.value, "member1":host_token},
+            {"live_id":live_id, "select_difficulty":select_difficulty.value, "status":WaitRoomStatus.Waiting.value, "member1":user_id},
         )
     return result.lastrowid
 
@@ -116,11 +117,11 @@ def list_room(live_id:int) -> list[RoomInfo]:
         room_info_list = _get_room_member_cnt_rom_room_by_live_id(conn, live_id)
     return room_info_list
 
-def _insert_new_member(conn, room_id:int, member_num:int, token:str) -> JoinRoomResult:
+def _insert_new_member(conn, room_id:int, member_num:int, user_id:int) -> JoinRoomResult:
     try:
         conn.execute(
-            text(f"UPDATE `room` SET `member{member_num}`=:member_token WHERE `room_id`=:room_id"),
-            {"room_id": room_id, "member_token":token}
+            text(f"UPDATE `room` SET `member{member_num}`=:member_id WHERE `room_id`=:room_id"),
+            {"room_id": room_id, "member_id":user_id}
         )
         return JoinRoomResult.Ok
     except NoResultFound:
@@ -128,6 +129,7 @@ def _insert_new_member(conn, room_id:int, member_num:int, token:str) -> JoinRoom
 
 def _join_as_room_member(conn, room_id:int, token: str) -> int:
     try:
+        user_id = _get_user_by_token(conn, token).id
         result = conn.execute(
             text("SELECT `member1`,`member2`,`member3`,`member4` FROM `room` WHERE `room_id`=:room_id"),
             {"room_id": room_id},
@@ -140,9 +142,9 @@ def _join_as_room_member(conn, room_id:int, token: str) -> int:
             # 解散
             return JoinRoomResult.Disbanded
         elif joined_user_count < MAX_USER_COUNT:
-            if token not in members:
+            if user_id not in members:
                 # 空いてる席に追加
-                return _insert_new_member(conn, room_id, absent_member_idx[0], token)
+                return _insert_new_member(conn, room_id, absent_member_idx[0], user_id)
             else:
                 return JoinRoomResult.Ok
         else:
@@ -162,23 +164,23 @@ def _get_user_info(conn, row, req_token) -> Tuple[WaitRoomStatus, list[RoomUser]
     host = row["owner"]
     select_difficulty = LiveDifficulty.Normal if row["select_difficulty"] == 1 else LiveDifficulty.Hard
     try:
-        token_user_id_dict = {row[f"member{i}"]: i for i in range(1,MAX_USER_COUNT + 1) if row[f"member{i}"] is not None}
-        if len(token_user_id_dict.values()) == 0:
+        user_id_dict = {row[f"member{i}"]: i for i in range(1,MAX_USER_COUNT + 1) if row[f"member{i}"] is not None}
+        if len(user_id_dict.values()) == 0:
             # Dissolution
             return status, []
         result = conn.execute(
-            text("SELECT `id`, `name`, `leader_card_id`, `token` FROM `user` WHERE `token` IN :tokens"),
-            {"tokens": list(token_user_id_dict.keys())}
+            text("SELECT `id`, `name`, `leader_card_id`, `token` FROM `user` WHERE `id` IN :user_ids"),
+            {"user_ids": list(user_id_dict.keys())}
         )
         member_rows = result.all()
         for row in member_rows:
             user_info_list.append(
                 RoomUser(
-                    user_id=token_user_id_dict[row["token"]], name=row["name"],
+                    user_id=row["id"], name=row["name"],
                     leader_card_id=row["leader_card_id"], select_difficulty=select_difficulty,
                     is_me=row["token"] == req_token,
                     # ここのホストの部分はよく考える必要がある
-                    is_host=row["token"] == host
+                    is_host=row["id"] == host
                 )
             )
         return status, user_info_list
@@ -222,12 +224,13 @@ def _insert_room_into_result_table(conn, row):
 def start_room(room_id:int, token:str) -> None:
     with engine.begin() as conn:
         try:
+            user_id = _get_user_by_token(conn, token).id
             result = conn.execute(
                 text("SELECT `room_id`,`member1`,`member2`,`member3`,`member4`,`owner` FROM `room` WHERE `room_id`=:room_id"),
                 {"room_id": room_id}
             )
             row = result.one()
-            if token == row["owner"]:
+            if user_id == row["owner"]:
                 result = conn.execute(
                     text("UPDATE `room` SET `status`=:status WHERE `room_id`=:room_id"),
                     {"status": WaitRoomStatus.LiveStart.value, "room_id": room_id}
@@ -239,15 +242,16 @@ def start_room(room_id:int, token:str) -> None:
         except NoResultFound as e:
             raise e
 
-def _get_user_id_from_result(conn, room_id:int, token:str) -> int:
+def _get_room_user_id_from_result(conn, room_id:int, token:str) -> int:
     try:
+        user_id = _get_user_by_token(conn, token).id
         result = conn.execute(
             text("SELECT `member1`,`member2`,`member3`,`member4` FROM `result` WHERE `room_id`=:room_id"),
             {"room_id": room_id}
         )
         row = result.one()
         for i in range(1, 1 + MAX_USER_COUNT):
-            if token == row[f"member{i}"]:
+            if user_id == row[f"member{i}"]:
                 return i
     except NoResultFound:
         return None
@@ -267,8 +271,8 @@ def _update_myresult_by_user_id(conn, room_id:int, user_id:int, score:int, judge
 
 def end_room(room_id:int, score:int, judge_count_list:list[int], token) -> None:
     with engine.begin() as conn:
-        user_id = _get_user_id_from_result(conn, room_id, token)
-        _update_myresult_by_user_id(conn, room_id, user_id, score, judge_count_list)
+        room_user_id = _get_room_user_id_from_result(conn, room_id, token)
+        _update_myresult_by_user_id(conn, room_id, room_user_id, score, judge_count_list)
 
 def check_can_return(row):
     member_num = row["member_num"]

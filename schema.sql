@@ -14,11 +14,11 @@ CREATE TABLE `room` (
   `live_id` int DEFAULT NULL,
   `select_difficulty` int DEFAULT NULL,
   `status` int DEFAULT NULL,
-  `member1` varchar(255) DEFAULT NULL,
-  `member2` varchar(255) DEFAULT NULL,
-  `member3` varchar(255) DEFAULT NULL,
-  `member4` varchar(255) DEFAULT NULL,
-  `owner` varchar(255) DEFAULT NULL,
+  `member1` bigint DEFAULT NULL,
+  `member2` bigint DEFAULT NULL,
+  `member3` bigint DEFAULT NULL,
+  `member4` bigint DEFAULT NULL,
+  `owner` bigint DEFAULT NULL,
   PRIMARY KEY (`room_id`),
   UNIQUE KEY `room_id` (`room_id`)
 );
@@ -26,10 +26,10 @@ CREATE TABLE `room` (
 DROP TABLE IF EXISTS `result`;
 CREATE TABLE `result` (
   `room_id` bigint NOT NULL,
-  `member1` varchar(255) DEFAULT NULL,
-  `member2` varchar(255) DEFAULT NULL,
-  `member3` varchar(255) DEFAULT NULL,
-  `member4` varchar(255) DEFAULT NULL,
+  `member1` bigint DEFAULT NULL,
+  `member2` bigint DEFAULT NULL,
+  `member3` bigint DEFAULT NULL,
+  `member4` bigint DEFAULT NULL,
   `member_num` int DEFAULT NULL,
   `judge_count_list1` varchar(255) DEFAULT NULL,
   `judge_count_list2` varchar(255) DEFAULT NULL,

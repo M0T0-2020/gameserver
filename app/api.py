@@ -1,7 +1,6 @@
 from enum import Enum
 from select import select
 import stat
-from typing import List
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer

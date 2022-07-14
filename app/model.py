@@ -101,6 +101,9 @@ def _get_room_member_cnt_rom_room_by_live_id(conn, live_id:int) -> list[Optional
         rows = result.all()
         room_info_list = []
         for row in rows:
+            room_status = WaitRoomStatus(row["status"])
+            if room_status == WaitRoomStatus.Dissolution or room_status == WaitRoomStatus.LiveStart:
+                continue
             joined_user_count = sum([1 if row[f"member{i}"] is not None else 0 for i in range(1,MAX_USER_COUNT + 1)])
             max_user_count = MAX_USER_COUNT
             room_info_list.append(
@@ -286,9 +289,9 @@ def _get_result_user_list_from_row(row) -> list[ResultUser]:
     user_ids = [row[f"member{i}"] for i in range(1, MAX_USER_COUNT + 1) if row[f"score{i}"] is not None]
     scores = [row[f"score{i}"] for i in range(1,MAX_USER_COUNT + 1) if row[f"score{i}"] is not None]
     judge_count_lists = [row[f"judge_count_list{i}"].split(", ") for i in range(1,MAX_USER_COUNT + 1) if row[f"judge_count_list{i}"] is not None]
+    judge_count_lists = [list(map(int, judge_count_list)) for judge_count_list in judge_count_lists]
     # sort
-    judge_count_lists = [map(int, judge_count_list) for judge_count_list in judge_count_lists]
-    judge_count_lists = [sorted(judge_count_list) for judge_count_list in judge_count_lists]
+    # judge_count_lists = [sorted(judge_count_list) for judge_count_list in judge_count_lists]
     for u_id, score, judge_count_list in zip(user_ids, scores, judge_count_lists):
         resultuser_list.append(
             ResultUser(user_id=u_id, judge_count_list=judge_count_list, score=score)

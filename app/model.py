@@ -283,6 +283,7 @@ def _get_result_user_list_from_row(row) -> list[ResultUser]:
     scores = [row[f"score{i}"] for i in range(1,MAX_USER_COUNT + 1) if row[f"score{i}"] is not None]
     judge_count_lists = [row[f"judge_count_list{i}"].split(", ") for i in range(1,MAX_USER_COUNT + 1) if row[f"judge_count_list{i}"] is not None]
     # sort
+    judge_count_lists = [map(int, judge_count_list) for judge_count_list in judge_count_lists]
     judge_count_lists = [sorted(judge_count_list) for judge_count_list in judge_count_lists]
     for u_id, score, judge_count_list in zip(user_ids, scores, judge_count_lists):
         resultuser_list.append(

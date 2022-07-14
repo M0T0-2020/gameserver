@@ -5,8 +5,10 @@ from typing import Optional, Tuple
 
 from fastapi import HTTPException
 from pydantic import BaseModel
+from pyparsing import Opt
 from sqlalchemy import text
 from sqlalchemy.exc import NoResultFound
+from urllib3 import Retry
 
 from .db import engine
 from .config import MAX_USER_COUNT
@@ -245,7 +247,7 @@ def start_room(room_id:int, token:str) -> None:
         except NoResultFound as e:
             raise e
 
-def _get_room_user_id_from_result(conn, room_id:int, token:str) -> int:
+def _get_room_user_id_from_result(conn, room_id:int, token:str) -> Tuple[int, bool]:
     try:
         user_id = _get_user_by_token(conn, token).id
         result = conn.execute(
@@ -314,3 +316,68 @@ def result_room(room_id:int) -> None:
     with engine.begin() as conn:
         result_user_list = _get_result_user_list(conn, room_id)
     return result_user_list
+
+def _sample_room_member_id(conn, room_id:int, leave_room_user_id:int):
+    try:
+        result = conn.execute(
+            text("SELECT `member1`,`member2`,`member3`,`member4` FROM `room` WHERE `room_id`=:room_id"),
+            {"room_id": room_id}
+        )
+        row = result.one()
+        for i in range(1, MAX_USER_COUNT + 1):
+            if (i != leave_room_user_id) and (row[f"member{i}"] is not None):
+                return row[f"member{i}"]
+        return "none"
+    except NoResultFound:
+        return None
+
+def _leave_room_by_user_id(conn, room_id:int, leave_room_user_id:int, is_owner:bool):
+    try:
+        if is_owner:
+            new_owner = _sample_room_member_id(conn, room_id, leave_room_user_id)
+            print(f"new_owner {new_owner}")
+            if new_owner != "none":
+                conn.execute(
+                    text(
+                        f"UPDATE `room` SET member{leave_room_user_id}=NULL, owner=:new_owner WHERE room_id=:room_id"
+                    ),
+                    {"room_id":room_id, "new_owner":new_owner}
+                )
+            else:
+                # status -> 解散
+                conn.execute(
+                    text(
+                        "UPDATE `room` SET status=:dissolution WHERE room_id=:room_id"
+                    ),
+                    {"room_id":room_id, "dissolution":WaitRoomStatus.Dissolution.value}
+                )
+        else:
+            conn.execute(
+                text(
+                    f"UPDATE `room` SET member{leave_room_user_id}=NULL WHERE room_id=:room_id"
+                ),
+                {"room_id":room_id}
+            )
+    except NoResultFound as e:
+        raise e
+        # return None
+
+def _get_room_user_id_from_room(conn, room_id:int, token:str) -> Tuple[int, bool]:
+    try:
+        user_id = _get_user_by_token(conn, token).id
+        result = conn.execute(
+            text("SELECT `member1`,`member2`,`member3`,`member4`, `owner` FROM `room` WHERE `room_id`=:room_id"),
+            {"room_id": room_id}
+        )
+        row = result.one()
+        for i in range(1, 1 + MAX_USER_COUNT):
+            if user_id == row[f"member{i}"]:
+                return i, user_id == row["owner"]
+    except NoResultFound:
+        return None
+    return None
+
+def leave_room(room_id:int, token:str) -> None:
+    with engine.begin() as conn:
+        room_user_id, is_owner = _get_room_user_id_from_room(conn, room_id, token)
+        _leave_room_by_user_id(conn, room_id, room_user_id, is_owner)

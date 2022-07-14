@@ -103,3 +103,9 @@ class RoomResultRequest(BaseModel):
 
 class RoomResultResponse(BaseModel):
     result_user_list:list[ResultUser]
+
+class RoomLeaveRequest(BaseModel):
+    room_id:int
+
+class RoomLeaveResponse(BaseModel):
+    pass

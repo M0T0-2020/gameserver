@@ -31,6 +31,7 @@ CREATE TABLE `result` (
   `member2` varchar(255) DEFAULT NULL,
   `member3` varchar(255) DEFAULT NULL,
   `member4` varchar(255) DEFAULT NULL,
+  `member_num` int DEFAULT NULL,
   `judge_count_list1` varchar(255) DEFAULT NULL,
   `judge_count_list2` varchar(255) DEFAULT NULL,
   `judge_count_list3` varchar(255) DEFAULT NULL,

@@ -213,9 +213,12 @@ def wait_room(room_id:int, token:str) -> Tuple[WaitRoomStatus, List[RoomUser]]:
 
 def _insert_room_into_result_table(conn, row):
     try:
-        inset_col = "room_id, " + ", ".join([f"member{i}" for i in range(1,1 + MAX_USER_COUNT) if row[f"member{i}"] is not None])
+        members = [f"member{i}" for i in range(1,1 + MAX_USER_COUNT) if row[f"member{i}"] is not None]
+        inset_col = "room_id, member_num, " + ", ".join(members)
         inset_col_with_colon = ", ".join([":" + s for s in inset_col.split(', ')])
-        value_dict = {s:row[s] for s in inset_col.split(', ')}
+        value_dict = {s:row[s] for s in members}
+        value_dict["room_id"] = row["room_id"]
+        value_dict["member_num"] = len(members)
         result = conn.execute(
             text(
                 f"INSERT INTO `result` ({inset_col}) VALUES ({inset_col_with_colon})"

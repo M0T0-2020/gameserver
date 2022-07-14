@@ -129,13 +129,14 @@ def _get_room_member_cnt_rom_room_by_live_id(
     conn, live_id: int
 ) -> list[Optional[RoomInfo]]:
     try:
+        where_query = "WHERE room.live_id=:live_id" if live_id != 0 else ""
         result = conn.execute(
             text(
-                """
+                f"""
                 SELECT room.room_id, status, live_id,  COUNT(member_id) AS joined_user_count
                 FROM member
                 INNER JOIN room ON member.room_id=room.room_id
-                WHERE room.live_id=:live_id GROUP BY room.room_id
+                {where_query} GROUP BY room.room_id
                 """
             ),
             {"live_id": live_id},

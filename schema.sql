@@ -23,3 +23,23 @@ CREATE TABLE `room` (
   UNIQUE KEY `room_id` (`room_id`)
 
 );
+
+DROP TABLE IF EXISTS `result`;
+CREATE TABLE `result` (
+  `room_id` bigint NOT NULL,
+  `member1` varchar(255) DEFAULT NULL,
+  `member2` varchar(255) DEFAULT NULL,
+  `member3` varchar(255) DEFAULT NULL,
+  `member4` varchar(255) DEFAULT NULL,
+  `judge_count_list1` varchar(255) DEFAULT NULL,
+  `judge_count_list2` varchar(255) DEFAULT NULL,
+  `judge_count_list3` varchar(255) DEFAULT NULL,
+  `judge_count_list4` varchar(255) DEFAULT NULL,
+  `score1` int DEFAULT NULL,
+  `score2` int DEFAULT NULL,
+  `score3` int DEFAULT NULL,
+  `score4` int DEFAULT NULL,
+  PRIMARY KEY (`room_id`),
+  UNIQUE KEY `room_id` (`room_id`)
+
+);

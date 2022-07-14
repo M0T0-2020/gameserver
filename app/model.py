@@ -213,20 +213,39 @@ def wait_room(room_id:int, token:str) -> Tuple[WaitRoomStatus, List[RoomUser]]:
         status, room_user_list = _get_room_user_list(conn, room_id, token)
     return status, room_user_list
 
-def start_room(room_id:int, token) -> None:
+def _insert_room_into_result_table(conn, row):
+    try:
+        inset_col = "room_id, " + ", ".join([f"member{i}" for i in range(1,1 + MAX_USER_COUNT) if row[f"member{i}"] is not None])
+        inset_col_with_colon = ", ".join([":" + s for s in inset_col.split(', ')])
+        value_dict = {s:row[s] for s in inset_col.split(', ')}
+        result = conn.execute(
+            text(
+                f"INSERT INTO `result` ({inset_col}) VALUES ({inset_col_with_colon})"
+            ), value_dict
+        )
+    except NoResultFound:
+        return None
+
+
+def start_room(room_id:int, token:str) -> None:
     with engine.begin() as conn:
         try:
             result = conn.execute(
-                text("SELECT `owner` FROM `room` WHERE `room_id`=:room_id"),
+                text("SELECT `room_id`,`member1`,`member2`,`member3`,`member4`,`owner` FROM `room` WHERE `room_id`=:room_id"),
                 {"room_id": room_id}
             )
-            if token == result.one()["owner"]:
+            row = result.one()
+            if token == row["owner"]:
                 result = conn.execute(
                     text("UPDATE `room` SET `status`=:status WHERE `room_id`=:room_id"),
                     {"status": WaitRoomStatus.LiveStart.value, "room_id": room_id}
                 )
+                _insert_room_into_result_table(conn, row)
             else:
                 print("owner is diffrent!!")
                 raise Exception
         except NoResultFound as e:
             raise e
+
+def end_room(room_id:int, score:int, judge_count_list:List[int], token) -> None:
+    pass

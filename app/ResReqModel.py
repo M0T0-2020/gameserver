@@ -84,3 +84,12 @@ class RoomStartRequest(BaseModel):
 
 class RoomStartResponse(BaseModel):
     pass
+
+class RoomEndRequest(BaseModel):
+    room_id:int
+    # paefect, great, good, bad, missの順
+    judge_count_list:List[int]
+    score:int
+
+class RoomEndResponse(BaseModel):
+    pass

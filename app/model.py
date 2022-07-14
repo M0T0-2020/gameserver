@@ -187,23 +187,21 @@ def _get_user_info(conn, row, req_token) -> List[RoomUser]:
 def _get_room_user_list(conn, room_id:str, token:str) -> List[RoomUser]:
     try:
         result = conn.execute(
-            text("SELECT `member1`,`member2`,`member3`,`member4`, `select_difficulty`, `owner` FROM `room` WHERE `room_id`=:room_id"),
+            text("SELECT `member1`,`member2`,`member3`,`member4`, `select_difficulty`, `owner`, `status` FROM `room` WHERE `room_id`=:room_id"),
             {"room_id": room_id}
         )
         row = result.one()
         user_info_list = _get_user_info(conn, row, token)
 
-        if len(user_info_list) == 0:
+        if WaitRoomStatus(row["status"]) == WaitRoomStatus.Dissolution:
             # Dissolution
             status = WaitRoomStatus.Dissolution
-        else:
+        elif WaitRoomStatus(row["status"]) == WaitRoomStatus.Waiting:
             # Waiting
             status = WaitRoomStatus.Waiting
-        """
-        elif len(user_info_list) == MAX_USER_COUNT:
+        else:
             # LiveStart
-            status = 2
-        """
+            status = WaitRoomStatus.LiveStart
         return status, user_info_list
     except NoResultFound:
         return None

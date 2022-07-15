@@ -90,7 +90,7 @@ def _insert_member(conn, room_id, user_id, select_difficulty: LiveDifficulty):
     try:
         conn.execute(
             text(
-                "INSERT INTO `member` (room_id, member_id, select_difficulty) VALUES (:room_id, :user_id, :select_difficulty)"
+                "INSERT INTO `member` (room_id, member_id, difficulty) VALUES (:room_id, :user_id, :select_difficulty)"
             ),
             {
                 "room_id": room_id,
@@ -188,7 +188,7 @@ def _join_as_room_member(conn, room_id: int, select_difficulty: LiveDifficulty, 
         else:
             conn.execute(
                 text(
-                    "INSERT INTO `member` (room_id, member_id, select_difficulty) VALUES (:room_id, :user_id, :select_difficulty)"
+                    "INSERT INTO `member` (room_id, member_id, difficulty) VALUES (:room_id, :user_id, :select_difficulty)"
                 ),
                 {
                     "room_id": room_id,
@@ -218,7 +218,7 @@ def _get_user_info(conn, rows, req_user_id) -> Tuple[WaitRoomStatus, list[RoomUs
                 user_id=row["member_id"],
                 name=row["name"],
                 leader_card_id=row["leader_card_id"],
-                select_difficulty=LiveDifficulty(row["select_difficulty"]),
+                select_difficulty=LiveDifficulty(row["difficulty"]),
                 is_me=row["member_id"] == req_user_id,
                 is_host=row["member_id"] == host_user_id,
             )
@@ -234,7 +234,7 @@ def _get_room_user_list(
         result = conn.execute(
             text(
                 """
-                SELECT member_id, user.name, user.leader_card_id, select_difficulty, room.owner, room.status
+                SELECT member_id, user.name, user.leader_card_id, difficulty, room.owner, room.status
                 FROM member
                 INNER JOIN user
                 ON member.member_id=user.id
@@ -288,7 +288,7 @@ def _update_myresult_by_user_id(
             text(
                 """
                 UPDATE `member`
-                SET score=:score, judge_count_list=:judge_count
+                SET score=:score, judge_count=:judge_count
                 WHERE room_id=:room_id AND member_id=:user_id
                 """
             ),
@@ -324,7 +324,7 @@ def _get_result_user_list_from_row(rows) -> list[ResultUser]:
         u_id, score, judge_count_list = (
             row["member_id"],
             row["score"],
-            row["judge_count_list"],
+            row["judge_count"],
         )
         judge_count_list = list(map(int, judge_count_list.split(", ")))
         resultuser_list.append(
@@ -338,7 +338,7 @@ def _get_result_user_list(conn, room_id) -> list[ResultUser]:
         result = conn.execute(
             text(
                 """
-                SELECT member_id, judge_count_list, score
+                SELECT member_id, judge_count, score
                 FROM member
                 WHERE room_id=:room_id
                 """

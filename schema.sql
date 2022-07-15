@@ -21,8 +21,8 @@ DROP TABLE IF EXISTS `member`;
 CREATE TABLE `member` (
   `room_id` bigint NOT NULL,
   `member_id` bigint NOT NULL,
-  `select_difficulty` int DEFAULT NULL,
-  `judge_count_list` varchar(255) DEFAULT NULL,
+  `difficulty` int DEFAULT NULL,
+  `judge_count` varchar(255) DEFAULT NULL,
   `score` int DEFAULT NULL
 
 );

@@ -140,7 +140,7 @@ def _get_room_member_cnt_rom_room_by_live_id(
                 HAVING COUNT(member_id) < 4
                 """
             ),
-            {"live_id": live_id, "waiting":WaitRoomStatus.Waiting.value},
+            {"live_id": live_id, "waiting": WaitRoomStatus.Waiting.value},
         )
         rows = result.all()
         if len(rows) == 0:
@@ -167,7 +167,9 @@ def list_room(live_id: int) -> list[RoomInfo]:
     return room_info_list
 
 
-def _join_as_room_member(conn, room_id: int, select_difficulty: LiveDifficulty, token: str) -> int:
+def _join_as_room_member(
+    conn, room_id: int, select_difficulty: LiveDifficulty, token: str
+) -> int:
     try:
         user_id = _get_user_by_token(conn, token).id
         result = conn.execute(
@@ -193,10 +195,14 @@ def _join_as_room_member(conn, room_id: int, select_difficulty: LiveDifficulty, 
                 {
                     "room_id": room_id,
                     "user_id": user_id,
-                    "select_difficulty":select_difficulty.value
+                    "select_difficulty": select_difficulty.value,
                 },
             )
-            joined_result = JoinRoomResult.Ok if joined_user_count + 1 < MAX_USER_COUNT else JoinRoomResult.RoomFull
+            joined_result = (
+                JoinRoomResult.Ok
+                if joined_user_count + 1 < MAX_USER_COUNT
+                else JoinRoomResult.RoomFull
+            )
             return joined_result
     except NoResultFound:
         return JoinRoomResult.OtherError

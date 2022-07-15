@@ -284,7 +284,7 @@ def start_room(room_id: int, token: str) -> None:
                 )
             else:
                 print("owner is diffrent!!")
-                raise Exception
+                return None
         except NoResultFound as e:
             raise e
 
@@ -447,6 +447,7 @@ def _get_room_user_id_from_room(conn, room_id: int, token: str) -> Tuple[int, bo
 
 
 def leave_room(room_id: int, token: str) -> None:
-    with engine.begin() as conn:
+    readcommitted_engine = engine.execution_options(isolation_level="READ COMMITTED")
+    with readcommitted_engine.begin() as conn:
         user_id, is_owner = _get_room_user_id_from_room(conn, room_id, token)
         _leave_room_by_user_id(conn, room_id, user_id, is_owner)

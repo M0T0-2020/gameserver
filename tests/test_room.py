@@ -4,10 +4,10 @@ from app.api import app
 
 client = TestClient(app)
 user_tokens = []
-
+user_num = 10
 
 def _create_users():
-    for i in range(10):
+    for i in range(user_num):
         response = client.post(
             "/user/create",
             json={"user_name": f"room_user_{i}", "leader_card_id": 1000},
@@ -53,7 +53,7 @@ def test_room_1():
     response = client.post(
         "/room/end",
         headers=_auth_header(),
-        json={"room_id": room_id, "score": 1234, "judge_count_list": [4, 3, 2]},
+        json={"room_id": room_id, "score": 1234, "judge_count_list": [4, 3, 2, 4, 1]},
     )
     assert response.status_code == 200
     print("room/end response:", response.json())

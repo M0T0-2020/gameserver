@@ -25,15 +25,17 @@ def _auth_header(i=0):
 
 
 def test_room_1():
-    response = client.post(
-        "/room/create",
-        headers=_auth_header(),
-        json={"live_id": 1001, "select_difficulty": 1},
-    )
-    assert response.status_code == 200
-
-    room_id = response.json()["room_id"]
-    print(f"room/create {room_id=}")
+    for i in range(5):
+        response = client.post(
+            "/room/create",
+            headers=_auth_header(i),
+            json={"live_id": 1001, "select_difficulty": 1},
+        )
+        assert response.status_code == 200
+        _room_id = response.json()["room_id"]
+        if i == 0:
+            room_id = _room_id
+        print(f"room/create {_room_id=}")
 
     response = client.post("/room/list", json={"live_id": 1001})
     assert response.status_code == 200
@@ -49,18 +51,33 @@ def test_room_1():
         response = client.post(
             "/room/join", headers=_auth_header(i), json={"room_id": room_id, "select_difficulty":2}
         )
+        assert response.status_code == 200
+        print("room/join response:", response.json())
+
+    response = client.post(
+        "/room/wait", headers=_auth_header(), json={"room_id": room_id}
+    )
+    assert response.status_code == 200
+    print("room/wait response:", response.json())
     
     response = client.post(
         "/room/leave",
-        headers=_auth_header(3),
+        headers=_auth_header(),
         json={"room_id": room_id},
     )
     assert response.status_code == 200
     print("room/leave response:", response.json())
+
+    response = client.post(
+        "/room/wait", headers=_auth_header(1), json={"room_id": room_id}
+    )
+    assert response.status_code == 200
+    print("room/wait response:", response.json())
     
     response = client.post(
         "/room/start", headers=_auth_header(), json={"room_id": room_id}
     )
+
     assert response.status_code == 200
     print("room/start response:", response.json())
 

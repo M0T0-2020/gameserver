@@ -177,14 +177,14 @@ def _join_as_room_member(
         result = conn.execute(
             text(
                 """
-                SELECT member_id AS joined_user_count
+                SELECT member_id
                 FROM member WHERE `room_id`=:room_id
                 """
             ),
             {"room_id": room_id},
         )
         rows = result.all()
-        user_id_list = [row["joined_user_count"] for row in rows]
+        user_id_list = [row["member_id"] for row in rows]
         joined_user_count = len(user_id_list)
         if joined_user_count == 0:
             # 解散
@@ -195,7 +195,8 @@ def _join_as_room_member(
                 if joined_user_count + 1 < MAX_USER_COUNT
                 else JoinRoomResult.RoomFull
             )
-            if user_id not in user_id_list:
+            if user_id not in user_id_list and joined_user_count < MAX_USER_COUNT:
+                print("join room")
                 conn.execute(
                     text(
                         "INSERT INTO `member` (room_id, member_id, difficulty) VALUES (:room_id, :user_id, :select_difficulty)"
@@ -207,7 +208,7 @@ def _join_as_room_member(
                     },
                 )    
             else:
-                print("already joined")        
+                print("already joined")
             return joined_result
     except NoResultFound:
         return JoinRoomResult.OtherError

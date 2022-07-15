@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.api import app
+from app.config import MAX_USER_COUNT
 
 client = TestClient(app)
 user_tokens = []
@@ -44,23 +45,33 @@ def test_room_1():
     assert response.status_code == 200
     print("room/wait response:", response.json())
 
+    for i in range(user_num):
+        response = client.post(
+            "/room/join", headers=_auth_header(i), json={"room_id": room_id, "select_difficulty":2}
+        )
+    
     response = client.post(
-        "/room/join", headers=_auth_header(1), json={"room_id": room_id, "select_difficulty":2}
+        "/room/leave",
+        headers=_auth_header(3),
+        json={"room_id": room_id},
     )
-
+    assert response.status_code == 200
+    print("room/leave response:", response.json())
+    
     response = client.post(
         "/room/start", headers=_auth_header(), json={"room_id": room_id}
     )
     assert response.status_code == 200
-    print("room/wait response:", response.json())
+    print("room/start response:", response.json())
 
-    response = client.post(
-        "/room/end",
-        headers=_auth_header(),
-        json={"room_id": room_id, "score": 1234, "judge_count_list": [4, 3, 2, 4, 1]},
-    )
-    assert response.status_code == 200
-    print("room/end response:", response.json())
+    for i in range(MAX_USER_COUNT - 1):
+        response = client.post(
+            "/room/end",
+            headers=_auth_header(),
+            json={"room_id": room_id, "score": 1234, "judge_count_list": [4, 3, 2, 4, 1]},
+        )
+        assert response.status_code == 200
+        print("room/end response:", response.json())
 
     response = client.post(
         "/room/result",
@@ -68,11 +79,3 @@ def test_room_1():
     )
     assert response.status_code == 200
     print("room/end response:", response.json())
-
-    response = client.post(
-        "/room/leave",
-        headers=_auth_header(),
-        json={"room_id": room_id},
-    )
-    assert response.status_code == 200
-    print("room/leave response:", response.json())

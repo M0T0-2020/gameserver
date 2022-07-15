@@ -86,15 +86,16 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
             return None
 
 
-def _insert_member(conn, room_id, user_id):
+def _insert_member(conn, room_id, user_id, select_difficulty: LiveDifficulty):
     try:
         conn.execute(
             text(
-                "INSERT INTO `member` (room_id, member_id) VALUES (:room_id, :user_id)"
+                "INSERT INTO `member` (room_id, member_id, select_difficulty) VALUES (:room_id, :user_id, :select_difficulty)"
             ),
             {
                 "room_id": room_id,
                 "user_id": user_id,
+                "select_difficulty": select_difficulty.value,
             },
         )
     except NoResultFound:
@@ -110,18 +111,17 @@ def create_room(host_token: str, live_id: int, select_difficulty: LiveDifficulty
         user_id = _get_user_by_token(conn, host_token).id
         result = conn.execute(
             text(
-                "INSERT INTO `room` (live_id, select_difficulty, status, owner) VALUES (:live_id, :select_difficulty, :status, :owner)"
+                "INSERT INTO `room` (live_id, status, owner) VALUES (:live_id, :status, :owner)"
             ),
             {
                 "live_id": live_id,
-                "select_difficulty": select_difficulty.value,
                 "status": WaitRoomStatus.Waiting.value,
                 "owner": user_id,
             },
         )
 
         room_id = result.lastrowid
-        _insert_member(conn, room_id, user_id)
+        _insert_member(conn, room_id, user_id, select_difficulty)
     return room_id
 
 
@@ -142,6 +142,8 @@ def _get_room_member_cnt_rom_room_by_live_id(
             {"live_id": live_id},
         )
         rows = result.all()
+        if len(rows) == 0:
+            return []
         can_show = (
             lambda room_status: room_status != WaitRoomStatus.Dissolution
             and room_status != WaitRoomStatus.LiveStart
@@ -168,7 +170,7 @@ def list_room(live_id: int) -> list[RoomInfo]:
     return room_info_list
 
 
-def _join_as_room_member(conn, room_id: int, token: str) -> int:
+def _join_as_room_member(conn, room_id: int, select_difficulty: LiveDifficulty, token: str) -> int:
     try:
         user_id = _get_user_by_token(conn, token).id
         result = conn.execute(
@@ -189,11 +191,12 @@ def _join_as_room_member(conn, room_id: int, token: str) -> int:
             try:
                 conn.execute(
                     text(
-                        "INSERT INTO `member` (room_id, member_id) VALUES (:room_id, :user_id)"
+                        "INSERT INTO `member` (room_id, member_id, select_difficulty) VALUES (:room_id, :user_id, :select_difficulty)"
                     ),
                     {
                         "room_id": room_id,
                         "user_id": user_id,
+                        "select_difficulty":select_difficulty.value
                     },
                 )
                 return JoinRoomResult.Ok
@@ -206,9 +209,9 @@ def _join_as_room_member(conn, room_id: int, token: str) -> int:
         return JoinRoomResult.OtherError
 
 
-def join_room(room_id: int, token: str) -> int:
+def join_room(room_id: int, select_difficulty: LiveDifficulty, token: str) -> int:
     with engine.begin() as conn:
-        status = _join_as_room_member(conn, room_id, token)
+        status = _join_as_room_member(conn, room_id, select_difficulty, token)
     return status
 
 
@@ -216,14 +219,13 @@ def _get_user_info(conn, rows, req_user_id) -> Tuple[WaitRoomStatus, list[RoomUs
     user_info_list = []
     status = WaitRoomStatus(rows[0]["status"])
     host_user_id = rows[0]["owner"]
-    select_difficulty = LiveDifficulty(rows[0]["select_difficulty"])
     for row in rows:
         user_info_list.append(
             RoomUser(
                 user_id=row["member_id"],
                 name=row["name"],
                 leader_card_id=row["leader_card_id"],
-                select_difficulty=select_difficulty,
+                select_difficulty=LiveDifficulty(row["select_difficulty"]),
                 is_me=row["member_id"] == req_user_id,
                 is_host=row["member_id"] == host_user_id,
             )
@@ -239,7 +241,7 @@ def _get_room_user_list(
         result = conn.execute(
             text(
                 """
-                SELECT member_id, user.name, user.leader_card_id, room.select_difficulty, room.owner, room.status
+                SELECT member_id, user.name, user.leader_card_id, select_difficulty, room.owner, room.status
                 FROM member
                 INNER JOIN user
                 ON member.member_id=user.id

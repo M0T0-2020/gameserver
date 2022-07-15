@@ -12,7 +12,6 @@ DROP TABLE IF EXISTS `room`;
 CREATE TABLE `room` (
   `room_id` bigint NOT NULL AUTO_INCREMENT,
   `live_id` int DEFAULT NULL,
-  `select_difficulty` int DEFAULT NULL,
   `status` int DEFAULT NULL,
   `owner` bigint DEFAULT NULL,
   PRIMARY KEY (`room_id`),
@@ -23,8 +22,8 @@ DROP TABLE IF EXISTS `member`;
 CREATE TABLE `member` (
   `room_id` bigint NOT NULL,
   `member_id` bigint NOT NULL,
+  `select_difficulty` int DEFAULT NULL,
   `judge_count_list` varchar(255) DEFAULT NULL,
-  `score` int DEFAULT NULL,
-  PRIMARY KEY (`room_id`, `member_id`)
+  `score` int DEFAULT NULL
 
 );

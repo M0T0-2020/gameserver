@@ -135,19 +135,17 @@ def _get_room_member_cnt_rom_room_by_live_id(
                 f"""
                 SELECT room.room_id, status, live_id,  COUNT(member_id) AS joined_user_count
                 FROM member
-                INNER JOIN room ON member.room_id=room.room_id
+                INNER JOIN room ON member.room_id=room.room_id AND room.status=:waiting
                 {where_query} GROUP BY room.room_id
+                HAVING COUNT(member_id) < 4
                 """
             ),
-            {"live_id": live_id},
+            {"live_id": live_id, "waiting":WaitRoomStatus.Waiting.value},
         )
         rows = result.all()
         if len(rows) == 0:
             return []
-        can_show = (
-            lambda room_status: room_status != WaitRoomStatus.Dissolution
-            and room_status != WaitRoomStatus.LiveStart
-        )
+
         room_info_list = [
             RoomInfo(
                 room_id=row["room_id"],
@@ -156,7 +154,6 @@ def _get_room_member_cnt_rom_room_by_live_id(
                 max_user_count=MAX_USER_COUNT,
             )
             for row in rows
-            if can_show(WaitRoomStatus(row["status"]))
         ]
         return room_info_list
     except NoResultFound:
@@ -178,6 +175,7 @@ def _join_as_room_member(conn, room_id: int, select_difficulty: LiveDifficulty, 
                 """
                 SELECT COUNT(member_id) AS joined_user_count
                 FROM `member` WHERE `room_id`=:room_id
+                HAVING COUNT(member_id) < 4
                 """
             ),
             {"room_id": room_id},
@@ -187,24 +185,19 @@ def _join_as_room_member(conn, room_id: int, select_difficulty: LiveDifficulty, 
         if joined_user_count == 0:
             # 解散
             return JoinRoomResult.Disbanded
-        elif joined_user_count < MAX_USER_COUNT:
-            try:
-                conn.execute(
-                    text(
-                        "INSERT INTO `member` (room_id, member_id, select_difficulty) VALUES (:room_id, :user_id, :select_difficulty)"
-                    ),
-                    {
-                        "room_id": room_id,
-                        "user_id": user_id,
-                        "select_difficulty":select_difficulty.value
-                    },
-                )
-                return JoinRoomResult.Ok
-            except NoResultFound:
-                return JoinRoomResult.OtherError
         else:
-            # RoomFull
-            return JoinRoomResult.RoomFull
+            conn.execute(
+                text(
+                    "INSERT INTO `member` (room_id, member_id, select_difficulty) VALUES (:room_id, :user_id, :select_difficulty)"
+                ),
+                {
+                    "room_id": room_id,
+                    "user_id": user_id,
+                    "select_difficulty":select_difficulty.value
+                },
+            )
+            joined_result = JoinRoomResult.Ok if joined_user_count + 1 < MAX_USER_COUNT else JoinRoomResult.RoomFull
+            return joined_result
     except NoResultFound:
         return JoinRoomResult.OtherError
 

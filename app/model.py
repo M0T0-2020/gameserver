@@ -161,8 +161,10 @@ def _get_room_member_cnt_rom_room_by_live_id(
 
 
 def list_room(live_id: int) -> list[RoomInfo]:
-    room_info_list = []
-    with engine.begin() as conn:
+    # https://docs.sqlalchemy.org/en/14/core/connections.html#setting-transaction-isolation-levels-including-dbapi-autocommit
+    readcommitted_engine = engine.execution_options(isolation_level="READ COMMITTED")
+    with readcommitted_engine.begin() as conn:
+        # read committed にしたい
         room_info_list = _get_room_member_cnt_rom_room_by_live_id(conn, live_id)
     return room_info_list
 
@@ -209,7 +211,9 @@ def _join_as_room_member(
 
 
 def join_room(room_id: int, select_difficulty: LiveDifficulty, token: str) -> int:
-    with engine.begin() as conn:
+    readcommitted_engine = engine.execution_options(isolation_level="READ COMMITTED")
+    with readcommitted_engine.begin() as conn:
+        # read committed にしたい
         status = _join_as_room_member(conn, room_id, select_difficulty, token)
     return status
 

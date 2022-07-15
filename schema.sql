@@ -14,8 +14,7 @@ CREATE TABLE `room` (
   `live_id` int DEFAULT NULL,
   `status` int DEFAULT NULL,
   `owner` bigint DEFAULT NULL,
-  PRIMARY KEY (`room_id`),
-  UNIQUE KEY `room_id` (`room_id`)
+  PRIMARY KEY (`room_id`)
 );
 
 DROP TABLE IF EXISTS `member`;

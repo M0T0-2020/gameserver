@@ -206,7 +206,7 @@ def _join_as_room_member(
                         "user_id": user_id,
                         "select_difficulty": select_difficulty.value,
                     },
-                )    
+                )
             else:
                 print("already joined")
             return joined_result
@@ -379,8 +379,9 @@ def _sample_room_member_id(conn, room_id: int, leave_room_user_id: int):
             FROM member
             WHERE room_id=:room_id AND member_id!=:user_id
             LIMIT 1
-            """),
-        {"room_id": room_id, "user_id":leave_room_user_id},
+            """
+        ),
+        {"room_id": room_id, "user_id": leave_room_user_id},
     )
     # rowが一つもない時はNoneを返す
     row = result.one_or_none()
@@ -388,6 +389,7 @@ def _sample_room_member_id(conn, room_id: int, leave_room_user_id: int):
         return "none"
     else:
         return row["member_id"]
+
 
 def _leave_room_by_user_id(conn, room_id: int, leave_room_user_id: int, is_owner: bool):
     try:

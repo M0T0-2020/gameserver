@@ -7,6 +7,7 @@ client = TestClient(app)
 user_tokens = []
 user_num = 10
 
+
 def _create_users():
     for i in range(user_num):
         response = client.post(
@@ -49,7 +50,9 @@ def test_room_1():
 
     for i in range(user_num):
         response = client.post(
-            "/room/join", headers=_auth_header(i), json={"room_id": room_id, "select_difficulty":2}
+            "/room/join",
+            headers=_auth_header(i),
+            json={"room_id": room_id, "select_difficulty": 2},
         )
         assert response.status_code == 200
         print("room/join response:", response.json())
@@ -59,7 +62,7 @@ def test_room_1():
     )
     assert response.status_code == 200
     print("room/wait response:", response.json())
-    
+
     response = client.post(
         "/room/leave",
         headers=_auth_header(),
@@ -73,7 +76,7 @@ def test_room_1():
     )
     assert response.status_code == 200
     print("room/wait response:", response.json())
-    
+
     response = client.post(
         "/room/start", headers=_auth_header(), json={"room_id": room_id}
     )
@@ -85,7 +88,11 @@ def test_room_1():
         response = client.post(
             "/room/end",
             headers=_auth_header(),
-            json={"room_id": room_id, "score": 1234, "judge_count_list": [4, 3, 2, 4, 1]},
+            json={
+                "room_id": room_id,
+                "score": 1234,
+                "judge_count_list": [4, 3, 2, 4, 1],
+            },
         )
         assert response.status_code == 200
         print("room/end response:", response.json())

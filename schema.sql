@@ -23,6 +23,7 @@ CREATE TABLE `member` (
   `member_id` bigint NOT NULL,
   `difficulty` int DEFAULT NULL,
   `judge_count` varchar(255) DEFAULT NULL,
-  `score` int DEFAULT NULL
+  `score` int DEFAULT NULL,
+  PRIMARY KEY (`room_id`, `member_id`)
 
 );

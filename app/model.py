@@ -177,34 +177,37 @@ def _join_as_room_member(
         result = conn.execute(
             text(
                 """
-                SELECT COUNT(member_id) AS joined_user_count
-                FROM `member` WHERE `room_id`=:room_id
-                HAVING COUNT(member_id) < 4
+                SELECT member_id AS joined_user_count
+                FROM member WHERE `room_id`=:room_id
                 """
             ),
             {"room_id": room_id},
         )
-        row = result.one()
-        joined_user_count = row["joined_user_count"]
+        rows = result.all()
+        user_id_list = [row["joined_user_count"] for row in rows]
+        joined_user_count = len(user_id_list)
         if joined_user_count == 0:
             # 解散
             return JoinRoomResult.Disbanded
         else:
-            conn.execute(
-                text(
-                    "INSERT INTO `member` (room_id, member_id, difficulty) VALUES (:room_id, :user_id, :select_difficulty)"
-                ),
-                {
-                    "room_id": room_id,
-                    "user_id": user_id,
-                    "select_difficulty": select_difficulty.value,
-                },
-            )
             joined_result = (
                 JoinRoomResult.Ok
                 if joined_user_count + 1 < MAX_USER_COUNT
                 else JoinRoomResult.RoomFull
             )
+            if user_id not in user_id_list:
+                conn.execute(
+                    text(
+                        "INSERT INTO `member` (room_id, member_id, difficulty) VALUES (:room_id, :user_id, :select_difficulty)"
+                    ),
+                    {
+                        "room_id": room_id,
+                        "user_id": user_id,
+                        "select_difficulty": select_difficulty.value,
+                    },
+                )    
+            else:
+                print("already joined")        
             return joined_result
     except NoResultFound:
         return JoinRoomResult.OtherError

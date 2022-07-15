@@ -365,16 +365,21 @@ def result_room(room_id: int) -> None:
 
 def _sample_room_member_id(conn, room_id: int, leave_room_user_id: int):
     result = conn.execute(
-        text("SELECT member_id FROM `member` WHERE `room_id`=:room_id"),
-        {"room_id": room_id},
+        text(
+            """
+            SELECT member_id
+            FROM member
+            WHERE room_id=:room_id AND member_id!=:user_id
+            LIMIT 1
+            """),
+        {"room_id": room_id, "user_id":leave_room_user_id},
     )
-    rows = result.all()
-    for row in rows:
-        if row["member_id"] is not None:
-            if row["member_id"] != leave_room_user_id:
-                return row["member_id"]
-    return "none"
-
+    # rowが一つもない時はNoneを返す
+    row = result.one_or_none()
+    if row is None:
+        return "none"
+    else:
+        return row["member_id"]
 
 def _leave_room_by_user_id(conn, room_id: int, leave_room_user_id: int, is_owner: bool):
     try:
